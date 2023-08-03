@@ -26,7 +26,7 @@ contributions:
   readers:
     - command: napari-melt-pool-tracker.get_reader
       accepts_directories: false
-      filename_patterns: ['*.npy']
+      filename_patterns: ['*.h5']
   writers:
     - command: napari-melt-pool-tracker.write_multiple
       layer_types: ['image*','labels*']

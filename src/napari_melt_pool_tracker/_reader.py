@@ -1,10 +1,14 @@
 """
-This module is an example of a barebones numpy reader plugin for napari.
+This module is a reader plugin for h5 files from the TOMCAT and ID19 beamlines.
 
-It implements the Reader specification, but your plugin may choose to
-implement multiple readers or even other plugin contributions. see:
-https://napari.org/stable/plugins/guides.html?#readers
+The TOMCAT beamline h5 containes the data in "exchange" --> "data". In the ID19
+h5 file the data is stored in "image_stack".
+
+If you need to extend the plugin to h5 files from other beamlines, please add
+an additional `if` condition with the appropriate key to access the data.
 """
+
+import h5py
 import numpy as np
 
 
@@ -29,7 +33,7 @@ def napari_get_reader(path):
         path = path[0]
 
     # if we know we cannot read the file, we immediately return None.
-    if not path.endswith(".npy"):
+    if not path.endswith(".h5"):
         return None
 
     # otherwise we return the *function* that can read ``path``.
@@ -61,7 +65,16 @@ def reader_function(path):
     # handle both a string and a list of strings
     paths = [path] if isinstance(path, str) else path
     # load all files into array
-    arrays = [np.load(_path) for _path in paths]
+    arrays = []
+    for _path in paths:
+        with h5py.File(_path, "r") as f:
+            if "image_stack" in f:
+                # ID19 data
+                array = np.array(f["image_stack"])
+            else:
+                # Tomcat data
+                array = np.array(f["exchange"]["data"])
+            arrays.append(array)
     # stack arrays into single array
     data = np.squeeze(np.stack(arrays))
 
