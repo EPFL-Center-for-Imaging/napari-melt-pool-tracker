@@ -1,3 +1,5 @@
+import collections
+
 import numpy as np
 import pandas as pd
 import scipy
@@ -159,3 +161,164 @@ def determine_laser_speed_and_position_from_points(
     intercept1 = point1[1] - coef * point1[0]
     intercept2 = point2[1] - coef * point2[0]
     return coef, np.mean((intercept1, intercept2))
+
+
+def estimate_material_height(stack: np.array, x: int) -> int:
+    return np.sum(np.isclose(stack[:, :, x], 1), axis=1)
+
+
+def apply_2D_function_to_stack(
+    stack: np.array, func: collections.abc.Callable
+) -> np.array:
+    """
+    Helper function that allows runing 2D functions on each stack.
+    """
+    results = []
+    for img in stack:
+        results.append(func(img))
+    stack = np.stack(tuple(results), axis=0)
+    return stack
+
+
+def radial_gradient(
+    stack: np.array, center: (float, float), method: str = "sobel"
+) -> (np.array, np.array):
+    """
+    Calculates the gradient in the raidal direction from a center.
+
+    Parameters
+    ----------
+    stack : np.ndarray
+        First dimension is time and the remaing two are space.
+    method : str
+        Filter to be used
+
+    Returns
+    -------
+    rad_grad : np.ndarray
+        Radial gradient images.
+    angles : np.ndarray
+        The direction of the gradient for each point.
+    """
+    if method == "sobel":
+        x_grad = apply_2D_function_to_stack(stack, skimage.filters.sobel_v)
+        y_grad = apply_2D_function_to_stack(stack, skimage.filters.sobel_h)
+    elif method == "prewitt":
+        x_grad = apply_2D_function_to_stack(stack, skimage.filters.prewitt_v)
+        y_grad = apply_2D_function_to_stack(stack, skimage.filters.prewitt_h)
+    elif method == "scharr":
+        x_grad = apply_2D_function_to_stack(stack, skimage.filters.scharr_v)
+        y_grad = apply_2D_function_to_stack(stack, skimage.filters.scharr_h)
+    elif method == "farid":
+        x_grad = apply_2D_function_to_stack(stack, skimage.filters.farid_v)
+        y_grad = apply_2D_function_to_stack(stack, skimage.filters.farid_h)
+    else:
+        raise ValueError(
+            f"`method` can only be 'sobel', 'prewitt', 'scharr', or 'farid', not {method}."
+        )
+
+    # Calculate radial vectors
+    xx, yy = np.meshgrid(np.arange(stack.shape[2]), np.arange(stack.shape[1]))
+    xx = np.tile(xx, (stack.shape[0], 1, 1))
+    yy = np.tile(yy, (stack.shape[0], 1, 1))
+    xx = xx - center[:, 1, np.newaxis, np.newaxis]
+    yy = yy - center[:, 0, np.newaxis, np.newaxis]
+
+    # Normalize directional vectors
+    v_length = np.sqrt(xx**2 + yy**2)
+    xx = xx / v_length
+    yy = yy / v_length
+
+    # Remove sign to avoid different signs infront and behind the laser
+    xx = np.abs(xx)
+    yy = np.abs(yy)
+
+    # Project gradient in radial direction
+    rad_grad = x_grad * xx + y_grad * yy
+
+    return rad_grad, np.arctan2(x_grad, y_grad)
+
+
+def calculate_radial_gradient(stack):
+    XPOS = 115
+    material_height = estimate_material_height(stack, XPOS)
+    laser_positions = np.stack(
+        (material_height, np.ones(stack.shape[0]) * XPOS), axis=-1
+    )
+    radial_gradient_stack, gradient_directions = radial_gradient(
+        stack, laser_positions, method="sobel"
+    )
+    return radial_gradient_stack
+
+
+def incomplete_frames(stack: np.array) -> np.array:
+    """
+    Returns a mask of the frames that are not complete,
+    i.e. the reslicing window extends beyond the bounds
+    of the full size original data.
+    """
+    projection = np.sum(stack, axis=1)
+    mask = np.isclose(projection, 0)
+    mask = np.any(mask, axis=1)
+    return mask
+
+
+def get_surface(
+    stack: np.array,
+    surface_mask: np.array,
+    top_offset: int = 0,
+    bottom_offset: int = 20,
+) -> np.array:
+    """
+    Extractes the pixels right below the surface of the sample.
+
+    Parameters
+    ----------
+    stack : np.ndarray
+        Data.
+    surface_mask : np.ndarray
+        A mask that is True outside of the sample.
+    top_offset : int
+        Number of pixels to exclude below the surface.
+    bottom_offset : int
+        Number of pixels to include below the surface.
+
+    Returns
+    -------
+    surface : np.ndarray
+        Array of height bottom_offset - top_offset.
+        The other dimensions are identical to those
+        of stack.
+    """
+    n_time_points = stack.shape[0]
+    height = stack.shape[1]
+    width = stack.shape[2]
+
+    n_layers = bottom_offset - top_offset
+
+    surface = np.zeros((n_time_points, n_layers, width), dtype=float)
+
+    for i in range(n_time_points):
+        for j in range(width):
+            surface_height = np.max(np.where(surface_mask[i, :, j])[0])
+            if height - surface_height - top_offset < 1:
+                continue
+            k = min((n_layers, height - surface_height - top_offset))
+            surface[i, :k, j] = stack[
+                i,
+                surface_height + top_offset : surface_height + bottom_offset,
+                j,
+            ]
+    return surface
+
+
+def get_surface_image(stack, edges):
+    mask = incomplete_frames(stack)
+    stack = stack[~mask]
+    edges = edges[~mask]
+    surface_mask = np.isclose(stack, 1)
+    surface = get_surface(
+        edges[:-1], surface_mask[:-1], top_offset=0, bottom_offset=5
+    )
+    surface = np.sum(surface, axis=1)
+    return surface
