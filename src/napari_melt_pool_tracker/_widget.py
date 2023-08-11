@@ -9,7 +9,7 @@ Replace code below according to your needs.
 
 import numpy as np
 import skimage
-from qtpy.QtWidgets import QPushButton, QVBoxLayout, QWidget
+from qtpy.QtWidgets import QGroupBox, QPushButton, QVBoxLayout, QWidget
 
 from napari_melt_pool_tracker import _utils
 
@@ -19,31 +19,57 @@ class MeltPoolTrackerQWidget(QWidget):
         super().__init__()
         self.viewer = napari_viewer
 
-        btn1 = QPushButton("1. Split")
-        btn1.clicked.connect(self._split)
+        split_groupbox = QGroupBox("1. Split")
+        split_layout = QVBoxLayout()
+        split_groupbox.setLayout(split_layout)
+        btn = QPushButton("Run")
+        btn.clicked.connect(self._split)
+        split_layout.addWidget(btn)
 
-        btn2 = QPushButton("2. Determine laser speed and position")
-        btn2.clicked.connect(self._determine_laser_speed_and_position)
+        speed_pos_groupbox = QGroupBox("2. Determine laser speed and position")
+        speed_pos_layout = QVBoxLayout()
+        speed_pos_groupbox.setLayout(speed_pos_layout)
+        btn = QPushButton("Run")
+        btn.clicked.connect(self._determine_laser_speed_and_position)
+        speed_pos_layout.addWidget(btn)
 
-        btn3 = QPushButton("3. Reslice with moving window")
-        btn3.clicked.connect(self._reslice_with_moving_window)
+        window_groupbox = QGroupBox("3. Reslice with moving window")
+        window_layout = QVBoxLayout()
+        window_groupbox.setLayout(window_layout)
+        btn = QPushButton("Run")
+        btn.clicked.connect(self._reslice_with_moving_window)
+        window_layout.addWidget(btn)
 
-        btn4 = QPushButton("4. Filter image")
-        btn4.clicked.connect(self._filter)
+        filter_groupbox = QGroupBox("4. Filter image")
+        filter_layout = QVBoxLayout()
+        filter_groupbox.setLayout(filter_layout)
+        btn = QPushButton("Run")
+        btn.clicked.connect(self._filter)
+        filter_layout.addWidget(btn)
 
         btn5 = QPushButton("5. Calculate radial gradient")
         btn5.clicked.connect(self._calculate_radial_gradient)
+        radial_groupbox = QGroupBox("5. Calculate radial gradient")
+        radial_layout = QVBoxLayout()
+        radial_groupbox.setLayout(radial_layout)
+        btn = QPushButton("Run")
+        btn.clicked.connect(self._calculate_radial_gradient)
+        radial_layout.addWidget(btn)
 
-        btn6 = QPushButton("6. Annotate surface features")
-        btn6.clicked.connect(self._annotate_surface_features)
+        annotate_groupbox = QGroupBox("6. Annotate surface features")
+        annotate_layout = QVBoxLayout()
+        annotate_groupbox.setLayout(annotate_layout)
+        btn = QPushButton("Run")
+        btn.clicked.connect(self._annotate_surface_features)
+        annotate_layout.addWidget(btn)
 
         self.setLayout(QVBoxLayout())
-        self.layout().addWidget(btn1)
-        self.layout().addWidget(btn2)
-        self.layout().addWidget(btn3)
-        self.layout().addWidget(btn4)
-        self.layout().addWidget(btn5)
-        self.layout().addWidget(btn6)
+        self.layout().addWidget(split_groupbox)
+        self.layout().addWidget(speed_pos_groupbox)
+        self.layout().addWidget(window_groupbox)
+        self.layout().addWidget(filter_groupbox)
+        self.layout().addWidget(radial_groupbox)
+        self.layout().addWidget(annotate_groupbox)
 
         self.parameters = {}
 
