@@ -42,7 +42,8 @@ def determine_laser_speed_and_position(stack):
     # iso_forest = sklearn.ensemble.IsolationForest()
     # inliers = iso_forest.fit_predict(np.stack((x, maxima)).transpose())
     svm = sklearn.svm.SVR(kernel="linear")
-    svm.fit(x[150:-150, np.newaxis], maxima[150:-150])
+    # svm.fit(x[150:-150, np.newaxis], maxima[150:-150])
+    svm.fit(x[:, np.newaxis], maxima)
 
     # if name is not None:
     #     plt.imshow(proj_resliced)
@@ -96,21 +97,29 @@ def _reslice_with_moving_window(
     height = stack.shape[1]
     width = stack.shape[2]
 
-    first_pos = max(0, window_offset)
+    first_laser_pos = max(0, window_offset)
     last_laser_pos = min(
         round((-intercept) / coef), width - window_size + window_offset
     )
+    if last_laser_pos - first_laser_pos < 1:
+        raise ValueError("Window size and/or offset too large.")
 
     resliced = np.zeros(
-        (last_laser_pos - first_pos, height, window_size),
+        (last_laser_pos - first_laser_pos, height, window_size),
         dtype=stack.dtype,
     )
 
     positions = pd.DataFrame(
-        columns=["Time frame", "Laser position", "Window start", "Window stop"]
+        columns=[
+            "Time frame",
+            "Laser position",
+            "Window start",
+            "Window stop",
+        ],
+        dtype=int,
     )
 
-    for i, pos in enumerate(range(first_pos, last_laser_pos)):
+    for i, pos in enumerate(range(first_laser_pos, last_laser_pos)):
         t = round(intercept + pos * coef)
         resliced[i] = stack[
             t, :, pos - window_offset : pos - window_offset + window_size
@@ -239,11 +248,10 @@ def radial_gradient(
     return rad_grad, np.arctan2(x_grad, y_grad)
 
 
-def calculate_radial_gradient(stack):
-    XPOS = 115
-    material_height = estimate_material_height(stack, XPOS)
+def calculate_radial_gradient(stack, xpos=115):
+    material_height = estimate_material_height(stack, xpos)
     laser_positions = np.stack(
-        (material_height, np.ones(stack.shape[0]) * XPOS), axis=-1
+        (material_height, np.ones(stack.shape[0]) * xpos), axis=-1
     )
     radial_gradient_stack, gradient_directions = radial_gradient(
         stack, laser_positions, method="sobel"

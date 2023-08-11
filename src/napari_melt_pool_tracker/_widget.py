@@ -138,11 +138,35 @@ class MeltPoolTrackerQWidget(QWidget):
             points[:, 0], points[:, 1]
         )
 
+        self.window_offset = 30
+        self.window_size = min(130, stack.shape[2] - self.window_offset)
         resliced, self.position_df = _utils._reslice_with_moving_window(
-            stack=stack, coef=coef, intercept=intercept
+            stack=stack,
+            coef=coef,
+            intercept=intercept,
+            window_offset=self.window_offset,
+            window_size=self.window_size,
         )
+
+        n_frames = resliced.shape[0]
+        ts = np.arange(n_frames)
+        xs = np.ones(n_frames) * self.window_offset
+        ys = np.zeros(n_frames)
+        coord0 = np.stack([ts, ys, xs], axis=-1)
+        ys = np.ones(n_frames) * (resliced.shape[1] - 1)
+        coord1 = np.stack([ts, ys, xs], axis=-1)
+        coords = np.stack([coord0, coord1], axis=1)
+
         self.viewer.add_image(
             resliced, name=f"{self.parameters['name']}_resliced"
+        )
+        self.viewer.add_shapes(
+            data=coords,
+            shape_type="line",
+            edge_color="blue",
+            edge_width=1,
+            opacity=0.5,
+            name=f"{self.parameters['name']}_laser_pos",
         )
         self.viewer.layers[f"{self.parameters['name']}"].visible = False
         self.viewer.layers[f"{self.parameters['name']}_proj"].visible = False
@@ -170,7 +194,9 @@ class MeltPoolTrackerQWidget(QWidget):
         stack = self.viewer.layers[
             f"{self.parameters['name']}_resliced_filtered"
         ].data
-        radial_gradient_stack = _utils.calculate_radial_gradient(stack)
+        radial_gradient_stack = _utils.calculate_radial_gradient(
+            stack, xpos=self.window_offset
+        )
         self.viewer.add_image(
             radial_gradient_stack,
             name=f"{self.parameters['name']}_radial_gradient",
@@ -187,7 +213,6 @@ class MeltPoolTrackerQWidget(QWidget):
         ].visible = False
 
     def _annotate_surface_features(self):
-        self.parameters["name"] = "wall1_H5"
         stack = self.viewer.layers[
             f"{self.parameters['name']}_resliced_filtered"
         ].data
