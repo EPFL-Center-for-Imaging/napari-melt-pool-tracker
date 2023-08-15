@@ -9,7 +9,17 @@ Replace code below according to your needs.
 
 import numpy as np
 import skimage
-from qtpy.QtWidgets import QGroupBox, QPushButton, QVBoxLayout, QWidget
+from qtpy.QtCore import Qt
+from qtpy.QtWidgets import (
+    QCheckBox,
+    QGridLayout,
+    QGroupBox,
+    QLabel,
+    QPushButton,
+    QSlider,
+    QVBoxLayout,
+    QWidget,
+)
 
 from napari_melt_pool_tracker import _utils
 
@@ -27,11 +37,33 @@ class MeltPoolTrackerQWidget(QWidget):
         split_layout.addWidget(btn)
 
         speed_pos_groupbox = QGroupBox("2. Determine laser speed and position")
-        speed_pos_layout = QVBoxLayout()
+        speed_pos_layout = QGridLayout()
         speed_pos_groupbox.setLayout(speed_pos_layout)
+        auto_run_cb = QCheckBox("auto run")
+        self.overwrite_cb = QCheckBox("overwrite")
+        self.slider_median_img = QSlider(Qt.Horizontal)
+        self.slider_median_img.setMinimum(1)
+        self.slider_median_img.setMaximum(49)
+        self.slider_median_img.setValue(5)
+        self.slider_median_img.valueChanged.connect(
+            self._determine_laser_speed_and_position
+        )
+        self.slider_median_max = QSlider(Qt.Horizontal)
+        self.slider_median_max.setMinimum(1)
+        self.slider_median_max.setMaximum(49)
+        self.slider_median_max.setValue(9)
+        self.slider_median_max.valueChanged.connect(
+            self._determine_laser_speed_and_position
+        )
         btn = QPushButton("Run")
         btn.clicked.connect(self._determine_laser_speed_and_position)
-        speed_pos_layout.addWidget(btn)
+        speed_pos_layout.addWidget(auto_run_cb, 1, 1)
+        speed_pos_layout.addWidget(self.overwrite_cb, 1, 2)
+        speed_pos_layout.addWidget(QLabel("Median filter img"), 2, 1)
+        speed_pos_layout.addWidget(self.slider_median_img, 2, 2)
+        speed_pos_layout.addWidget(QLabel("Median filter max"), 3, 1)
+        speed_pos_layout.addWidget(self.slider_median_max, 3, 2)
+        speed_pos_layout.addWidget(btn, 4, 1, 1, 2)
 
         window_groupbox = QGroupBox("3. Reslice with moving window")
         window_layout = QVBoxLayout()
@@ -92,23 +124,47 @@ class MeltPoolTrackerQWidget(QWidget):
         self.viewer.add_image(data1, **meta)
 
     def _determine_laser_speed_and_position(self):
-        selected_layers = self.viewer.layers.selection
-        if len(selected_layers) == 0:
-            raise ValueError("No layers have been selected")
-        if len(selected_layers) > 1:
-            raise ValueError(
-                "Can only detect laser position in one layer at a time. You have selected {len(selected_layers)} layers."
-            )
-        layer = selected_layers.pop()
-        self.parameters["name"] = layer.name
-        stack = layer.data
+        if "name" not in self.parameters:
+            selected_layers = self.viewer.layers.selection
+            if len(selected_layers) == 0:
+                raise ValueError("No layers have been selected")
+            if len(selected_layers) > 1:
+                raise ValueError(
+                    "Can only detect laser position in one layer at a time. You have selected {len(selected_layers)} layers."
+                )
+            layer = selected_layers.pop()
+            self.parameters["name"] = layer.name
+
+        if self.overwrite_cb.isChecked():
+            layer_names = [
+                f"{self.parameters['name']}_proj",
+                f"{self.parameters['name']}_points",
+                f"{self.parameters['name']}_line",
+            ]
+            for layer_name in layer_names:
+                if layer_name in self.viewer.layers:
+                    self.viewer.layers.remove(layer_name)
+
+        stack = self.viewer.layers[self.parameters["name"]].data
+
+        kernel_size_img = self.slider_median_img.value()
+        kernel_size_max = self.slider_median_max.value()
+        # Make kernel sizes odd
+        if kernel_size_img % 2 == 0:
+            kernel_size_img -= 1
+        if kernel_size_max % 2 == 0:
+            kernel_size_max -= 1
 
         (
             proj_resliced,
             maxima,
             coef,
             intercept,
-        ) = _utils.determine_laser_speed_and_position(stack)
+        ) = _utils.determine_laser_speed_and_position(
+            stack,
+            kernel_size_img=kernel_size_img,
+            kernel_size_max=kernel_size_max,
+        )
 
         y0 = 0
         x0 = (y0 - intercept) / coef
@@ -136,6 +192,7 @@ class MeltPoolTrackerQWidget(QWidget):
             data=self.points,
             face_color="cyan",
             size=8,
+            opacity=0.2,
             name=f"{self.parameters['name']}_points",
         )
         self.viewer.add_shapes(

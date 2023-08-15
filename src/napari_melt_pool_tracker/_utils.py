@@ -7,7 +7,11 @@ import skimage
 import sklearn.svm
 
 
-def determine_laser_speed_and_position(stack):
+def determine_laser_speed_and_position(
+    stack,
+    kernel_size_img=5,
+    kernel_size_max=9,
+):
     """
     Infers the laser position and speed by fitting a
     line in the spatio tempol resliced version of the
@@ -18,6 +22,11 @@ def determine_laser_speed_and_position(stack):
     stack: np.ndarray
         The full size original images with one laser pass
         from right to left.
+    kernel_size_img: int
+        The length of the median filter applied along the
+        direction of the laser.
+    kernel_size_max: int
+        The length of the median filter applied to the maxima.
 
     Returns
     -------
@@ -29,29 +38,19 @@ def determine_laser_speed_and_position(stack):
     resliced = np.swapaxes(stack, 0, 1)
     proj_resliced = np.max(resliced, axis=0)
     footprint = (
-        np.eye(5, dtype=np.uint8)[:, ::-1]
-        + np.eye(5, dtype=np.uint8, k=1)[:, ::-1]
-        + np.eye(5, dtype=np.uint8, k=-1)[:, ::-1]
+        np.eye(kernel_size_img, dtype=np.uint8)[:, ::-1]
+        + np.eye(kernel_size_img, dtype=np.uint8, k=1)[:, ::-1]
+        + np.eye(kernel_size_img, dtype=np.uint8, k=-1)[:, ::-1]
     )
     proj_resliced = skimage.filters.median(proj_resliced, footprint=footprint)
     proj_resliced = skimage.filters.sobel_h(proj_resliced)
-    proj_resliced = proj_resliced[10:]
-    maxima = proj_resliced.argmax(0) + 10
-    maxima = scipy.signal.medfilt(maxima, kernel_size=9)
-    x = np.arange(len(maxima))
-    # iso_forest = sklearn.ensemble.IsolationForest()
-    # inliers = iso_forest.fit_predict(np.stack((x, maxima)).transpose())
-    svm = sklearn.svm.SVR(kernel="linear")
-    # svm.fit(x[150:-150, np.newaxis], maxima[150:-150])
-    svm.fit(x[:, np.newaxis], maxima)
+    # proj_resliced = proj_resliced[10:]
+    maxima = proj_resliced.argmax(0)  # + 10
+    maxima = scipy.signal.medfilt(maxima, kernel_size=kernel_size_max)
 
-    # if name is not None:
-    #     plt.imshow(proj_resliced)
-    #     plt.scatter(x, maxima, c=inliers)
-    #     x = np.linspace(0, len(maxima), 1000)
-    #     plt.plot(x, svm.predict(x[:, np.newaxis]), color="red")
-    #     plt.savefig(f"processed/spatio_temporal_reslicing/{name}.png")
-    #     plt.close()
+    x = np.arange(len(maxima))
+    svm = sklearn.svm.SVR(kernel="linear")
+    svm.fit(x[:, np.newaxis], maxima)
 
     intercept = svm.intercept_[0]
     coef = svm.coef_[0][0]
