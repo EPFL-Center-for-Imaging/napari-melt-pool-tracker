@@ -7,6 +7,7 @@ see: https://napari.org/stable/plugins/guides.html?#widgets
 Replace code below according to your needs.
 """
 
+import napari_cursor_tracker
 import numpy as np
 import skimage
 from qtpy.QtCore import Qt
@@ -88,12 +89,19 @@ class MeltPoolTrackerQWidget(QWidget):
         btn.clicked.connect(self._calculate_radial_gradient)
         radial_layout.addWidget(btn)
 
-        annotate_groupbox = QGroupBox("6. Annotate surface features")
-        annotate_layout = QVBoxLayout()
-        annotate_groupbox.setLayout(annotate_layout)
+        annotate_surface_groupbox = QGroupBox("6. Annotate surface features")
+        annotate_surface_layout = QVBoxLayout()
+        annotate_surface_groupbox.setLayout(annotate_surface_layout)
         btn = QPushButton("Run")
         btn.clicked.connect(self._annotate_surface_features)
-        annotate_layout.addWidget(btn)
+        annotate_surface_layout.addWidget(btn)
+
+        annotate_depth_groupbox = QGroupBox("7. Annotate depths")
+        annotate_depth_layout = QVBoxLayout()
+        annotate_depth_groupbox.setLayout(annotate_depth_layout)
+        annotate_depth_layout.addWidget(
+            napari_cursor_tracker.CursorTracker(self.viewer)
+        )
 
         self.setLayout(QVBoxLayout())
         self.layout().addWidget(split_groupbox)
@@ -101,7 +109,8 @@ class MeltPoolTrackerQWidget(QWidget):
         self.layout().addWidget(window_groupbox)
         self.layout().addWidget(filter_groupbox)
         self.layout().addWidget(radial_groupbox)
-        self.layout().addWidget(annotate_groupbox)
+        self.layout().addWidget(annotate_surface_groupbox)
+        self.layout().addWidget(annotate_depth_groupbox)
 
         self.parameters = {}
 
