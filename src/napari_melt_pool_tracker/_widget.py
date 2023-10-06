@@ -17,6 +17,7 @@ from qtpy.QtWidgets import (
     QGroupBox,
     QLabel,
     QPushButton,
+    QScrollArea,
     QSlider,
     QVBoxLayout,
     QWidget,
@@ -25,77 +26,141 @@ from qtpy.QtWidgets import (
 from napari_melt_pool_tracker import _utils
 
 
+class StepWidget(QGroupBox):
+    def __init__(
+        self, name, include_auto_run_and_overwrite=False, sliders=None
+    ):
+        """
+        Implements the widget unit used for a step in the pipeline.
+
+        Sliders should be a dict where the key is the name of the slider and
+        the value is tuple (min, max, initial_value) for the slider.
+        """
+        if sliders is None:
+            sliders = {}
+
+        super().__init__(name)
+        self.layout = QGridLayout()
+        self.setLayout(self.layout)
+        self.sliders = {}
+        row = 1
+        if include_auto_run_and_overwrite:
+            self.auto_run_cb = QCheckBox("auto run")
+            self.auto_run_cb.setChecked(True)
+            self.layout.addWidget(self.auto_run_cb, row, 1)
+            self.overwrite_cb = QCheckBox("overwrite")
+            self.overwrite_cb.setChecked(True)
+            self.layout.addWidget(self.overwrite_cb, row, 2)
+            row += 1
+        for name, params in sliders.items():
+            self.sliders[name] = QSlider(Qt.Horizontal)
+            self.sliders[name].setMinimum(params[0])
+            self.sliders[name].setMaximum(params[1])
+            self.sliders[name].setValue(params[2])
+            self.layout.addWidget(QLabel(name), row, 1)
+            self.layout.addWidget(self.sliders[name], row, 2)
+            row += 1
+        self.btn = QPushButton("Run")
+        self.layout.addWidget(self.btn, row, 1, 1, 2)
+
+
 class MeltPoolTrackerQWidget(QWidget):
     def __init__(self, napari_viewer):
         super().__init__()
         self.viewer = napari_viewer
 
-        split_groupbox = QGroupBox("1. Split")
-        split_layout = QVBoxLayout()
-        split_groupbox.setLayout(split_layout)
-        btn = QPushButton("Run")
-        btn.clicked.connect(self._split)
-        split_layout.addWidget(btn)
+        #####################
+        # Spliting
+        #####################
+        self.split_groupbox = StepWidget(name="1. Split")
+        self.split_groupbox.btn.clicked.connect(self._split)
 
-        speed_pos_groupbox = QGroupBox("2. Determine laser speed and position")
-        speed_pos_layout = QGridLayout()
-        speed_pos_groupbox.setLayout(speed_pos_layout)
-        auto_run_cb = QCheckBox("auto run")
-        self.overwrite_cb = QCheckBox("overwrite")
-        self.slider_median_img = QSlider(Qt.Horizontal)
-        self.slider_median_img.setMinimum(1)
-        self.slider_median_img.setMaximum(49)
-        self.slider_median_img.setValue(5)
-        self.slider_median_img.valueChanged.connect(
+        #####################
+        # Laser position
+        #####################
+        self.speed_pos_groupbox = StepWidget(
+            name="2. Determine laser speed and position",
+            include_auto_run_and_overwrite=True,
+            sliders={
+                "Median filter img": (1, 49, 5),
+                "Median filter max": (1, 49, 9),
+            },
+        )
+        self.speed_pos_groupbox.sliders[
+            "Median filter img"
+        ].valueChanged.connect(self._determine_laser_speed_and_position)
+        self.speed_pos_groupbox.sliders[
+            "Median filter max"
+        ].valueChanged.connect(self._determine_laser_speed_and_position)
+        self.speed_pos_groupbox.btn.clicked.connect(
             self._determine_laser_speed_and_position
         )
-        self.slider_median_max = QSlider(Qt.Horizontal)
-        self.slider_median_max.setMinimum(1)
-        self.slider_median_max.setMaximum(49)
-        self.slider_median_max.setValue(9)
-        self.slider_median_max.valueChanged.connect(
-            self._determine_laser_speed_and_position
+
+        #####################
+        # Reslice
+        #####################
+        self.window_groupbox = StepWidget(
+            name="3. Reslice with moving window",
+            include_auto_run_and_overwrite=True,
+            sliders={
+                "Left margin": (10, 100, 30),
+                "Right margin": (10, 200, 100),
+            },
         )
-        btn = QPushButton("Run")
-        btn.clicked.connect(self._determine_laser_speed_and_position)
-        speed_pos_layout.addWidget(auto_run_cb, 1, 1)
-        speed_pos_layout.addWidget(self.overwrite_cb, 1, 2)
-        speed_pos_layout.addWidget(QLabel("Median filter img"), 2, 1)
-        speed_pos_layout.addWidget(self.slider_median_img, 2, 2)
-        speed_pos_layout.addWidget(QLabel("Median filter max"), 3, 1)
-        speed_pos_layout.addWidget(self.slider_median_max, 3, 2)
-        speed_pos_layout.addWidget(btn, 4, 1, 1, 2)
+        self.window_groupbox.sliders["Left margin"].valueChanged.connect(
+            self._reslice_with_moving_window
+        )
+        self.window_groupbox.sliders["Right margin"].valueChanged.connect(
+            self._reslice_with_moving_window
+        )
+        self.window_groupbox.btn.clicked.connect(
+            self._reslice_with_moving_window
+        )
 
-        window_groupbox = QGroupBox("3. Reslice with moving window")
-        window_layout = QVBoxLayout()
-        window_groupbox.setLayout(window_layout)
-        btn = QPushButton("Run")
-        btn.clicked.connect(self._reslice_with_moving_window)
-        window_layout.addWidget(btn)
+        #####################
+        # Denoise image
+        #####################
+        self.filter_groupbox = StepWidget(
+            name="4. Filter image",
+            include_auto_run_and_overwrite=True,
+            sliders={
+                "Kernel t": (1, 15, 7),
+                "Kernel y": (1, 15, 3),
+                "Kernel x": (1, 15, 3),
+            },
+        )
+        self.filter_groupbox.sliders["Kernel t"].valueChanged.connect(
+            self._filter
+        )
+        self.filter_groupbox.sliders["Kernel y"].valueChanged.connect(
+            self._filter
+        )
+        self.filter_groupbox.sliders["Kernel x"].valueChanged.connect(
+            self._filter
+        )
+        self.filter_groupbox.btn.clicked.connect(self._filter)
 
-        filter_groupbox = QGroupBox("4. Filter image")
-        filter_layout = QVBoxLayout()
-        filter_groupbox.setLayout(filter_layout)
-        btn = QPushButton("Run")
-        btn.clicked.connect(self._filter)
-        filter_layout.addWidget(btn)
+        #####################
+        # Radial gradient
+        #####################
+        self.radial_groupbox = StepWidget(name="5. Calculate radial gradient")
+        self.radial_groupbox.btn.clicked.connect(
+            self._calculate_radial_gradient
+        )
 
-        btn5 = QPushButton("5. Calculate radial gradient")
-        btn5.clicked.connect(self._calculate_radial_gradient)
-        radial_groupbox = QGroupBox("5. Calculate radial gradient")
-        radial_layout = QVBoxLayout()
-        radial_groupbox.setLayout(radial_layout)
-        btn = QPushButton("Run")
-        btn.clicked.connect(self._calculate_radial_gradient)
-        radial_layout.addWidget(btn)
+        #####################
+        # Surface annotation
+        #####################
+        self.annotate_surface_groupbox = StepWidget(
+            name="6. Annotate surface features"
+        )
+        self.annotate_surface_groupbox.btn.clicked.connect(
+            self._annotate_surface_features
+        )
 
-        annotate_surface_groupbox = QGroupBox("6. Annotate surface features")
-        annotate_surface_layout = QVBoxLayout()
-        annotate_surface_groupbox.setLayout(annotate_surface_layout)
-        btn = QPushButton("Run")
-        btn.clicked.connect(self._annotate_surface_features)
-        annotate_surface_layout.addWidget(btn)
-
+        #####################
+        # Depth annotation
+        #####################
         annotate_depth_groupbox = QGroupBox("7. Annotate depths")
         annotate_depth_layout = QVBoxLayout()
         annotate_depth_groupbox.setLayout(annotate_depth_layout)
@@ -103,14 +168,28 @@ class MeltPoolTrackerQWidget(QWidget):
             napari_cursor_tracker.CursorTracker(self.viewer)
         )
 
-        self.setLayout(QVBoxLayout())
-        self.layout().addWidget(split_groupbox)
-        self.layout().addWidget(speed_pos_groupbox)
-        self.layout().addWidget(window_groupbox)
-        self.layout().addWidget(filter_groupbox)
-        self.layout().addWidget(radial_groupbox)
-        self.layout().addWidget(annotate_surface_groupbox)
-        self.layout().addWidget(annotate_depth_groupbox)
+        # Set plugin layout
+        self.layout = QVBoxLayout()
+        self.setLayout(self.layout)
+
+        # Make plugin scrollable
+        self.scroll = QScrollArea(self)
+        self.layout.addWidget(self.scroll)
+        self.scroll.setWidgetResizable(True)
+        self.scroll_content = QWidget(self.scroll)
+        self.scroll_layout = QVBoxLayout(self.scroll_content)
+        self.scroll_content.setLayout(self.scroll_layout)
+
+        # Add individual widges to plugin
+        self.scroll_layout.addWidget(self.split_groupbox)
+        self.scroll_layout.addWidget(self.speed_pos_groupbox)
+        self.scroll_layout.addWidget(self.window_groupbox)
+        self.scroll_layout.addWidget(self.filter_groupbox)
+        self.scroll_layout.addWidget(self.radial_groupbox)
+        self.scroll_layout.addWidget(self.annotate_surface_groupbox)
+        self.scroll_layout.addWidget(annotate_depth_groupbox)
+
+        self.scroll.setWidget(self.scroll_content)
 
         self.parameters = {}
 
@@ -144,7 +223,7 @@ class MeltPoolTrackerQWidget(QWidget):
             layer = selected_layers.pop()
             self.parameters["name"] = layer.name
 
-        if self.overwrite_cb.isChecked():
+        if self.speed_pos_groupbox.overwrite_cb.isChecked():
             layer_names = [
                 f"{self.parameters['name']}_proj",
                 f"{self.parameters['name']}_points",
@@ -156,8 +235,12 @@ class MeltPoolTrackerQWidget(QWidget):
 
         stack = self.viewer.layers[self.parameters["name"]].data
 
-        kernel_size_img = self.slider_median_img.value()
-        kernel_size_max = self.slider_median_max.value()
+        kernel_size_img = self.speed_pos_groupbox.sliders[
+            "Median filter img"
+        ].value()
+        kernel_size_max = self.speed_pos_groupbox.sliders[
+            "Median filter max"
+        ].value()
         # Make kernel sizes odd
         if kernel_size_img % 2 == 0:
             kernel_size_img -= 1
@@ -230,8 +313,13 @@ class MeltPoolTrackerQWidget(QWidget):
             points[:, 0], points[:, 1]
         )
 
-        self.window_offset = 30
-        self.window_size = min(130, stack.shape[2] - self.window_offset)
+        left_margin = self.window_groupbox.sliders["Left margin"].value()
+        right_margin = self.window_groupbox.sliders["Right margin"].value()
+        self.window_offset = left_margin
+        self.window_size = left_margin + right_margin
+        self.window_size = min(
+            self.window_size, stack.shape[2] - self.window_offset
+        )
         resliced, self.position_df = _utils._reslice_with_moving_window(
             stack=stack,
             coef=coef,
@@ -249,16 +337,21 @@ class MeltPoolTrackerQWidget(QWidget):
         coord1 = np.stack([ts, ys, xs], axis=-1)
         coords = np.stack([coord0, coord1], axis=1)
 
-        self.viewer.add_image(
-            resliced, name=f"{self.parameters['name']}_resliced"
-        )
+        resliced_name = f"{self.parameters['name']}_resliced"
+        pos_name = f"{self.parameters['name']}_laser_pos"
+        if self.window_groupbox.overwrite_cb.isChecked():
+            if resliced_name in self.viewer.layers:
+                self.viewer.layers.remove(resliced_name)
+            if pos_name in self.viewer.layers:
+                self.viewer.layers.remove(pos_name)
+        self.viewer.add_image(resliced, name=resliced_name)
         self.viewer.add_shapes(
             data=coords,
             shape_type="line",
             edge_color="blue",
             edge_width=1,
             opacity=0.5,
-            name=f"{self.parameters['name']}_laser_pos",
+            name=pos_name,
         )
         self.viewer.layers[f"{self.parameters['name']}"].visible = False
         self.viewer.layers[f"{self.parameters['name']}_proj"].visible = False
@@ -270,7 +363,12 @@ class MeltPoolTrackerQWidget(QWidget):
         thresh = skimage.filters.threshold_otsu(stack)
         filtered = np.clip(stack, 0, thresh)
         filtered = filtered / np.max(filtered)
-        filtered = skimage.filters.median(filtered, np.ones((7, 3, 3)))
+        kernel_t = self.filter_groupbox.sliders["Kernel t"].value()
+        kernel_y = self.filter_groupbox.sliders["Kernel y"].value()
+        kernel_x = self.filter_groupbox.sliders["Kernel x"].value()
+        filtered = skimage.filters.median(
+            filtered, np.ones((kernel_t, kernel_y, kernel_x))
+        )
         self.viewer.add_image(
             filtered, name=f"{self.parameters['name']}_resliced_filtered"
         )
