@@ -35,8 +35,8 @@ def determine_laser_speed_and_position(
     intecept : float
         The intercept of the line fitted.
     """
-    resliced = np.swapaxes(stack, 0, 1)
-    proj_resliced = np.max(resliced, axis=0)
+    resliced = np.swapaxes(stack, 0, 2)
+    proj_resliced = np.max(resliced, axis=1)
     footprint = (
         np.eye(kernel_size_img, dtype=np.uint8)[:, ::-1]
         + np.eye(kernel_size_img, dtype=np.uint8, k=1)[:, ::-1]
@@ -57,7 +57,7 @@ def determine_laser_speed_and_position(
     return proj_resliced, maxima, coef, intercept
 
 
-def _reslice_with_moving_window(
+def reslice_with_moving_window(
     stack: np.array,
     coef: float,
     intercept: float,
@@ -93,23 +93,21 @@ def _reslice_with_moving_window(
         A data frame containing the positions of the window and the laser
         with respect to the full size original data.
     """
+    n_t = stack.shape[0]
     height = stack.shape[1]
     width = stack.shape[2]
 
-    first_laser_pos = max(0, window_offset)
-    last_laser_pos = min(
-        round((-intercept) / coef), width - window_size + window_offset
-    )
-    if last_laser_pos - first_laser_pos < 1:
+    if coef == 0:
+        raise ValueError("Coef is 0. This means the laser is not moving.")
+    if (coef > 0 and intercept >= height) or (coef < 0 and intercept <= 0):
         raise ValueError(
-            f"Window size and/or offset too large. Offset is {window_offset}. Size is {window_size}. Width of image is {width}. Intercept is {intercept}. Coef is {coef}."
+            f"For this combination of coef and intercept the line does not intercept the image. (coef={coef}, intercept={intercept})"
         )
 
     resliced = np.zeros(
-        (last_laser_pos - first_laser_pos, height, window_size),
+        (n_t, height, window_size),
         dtype=stack.dtype,
     )
-
     positions = pd.DataFrame(
         columns=[
             "Time frame",
@@ -120,25 +118,40 @@ def _reslice_with_moving_window(
         dtype=int,
     )
 
-    for i, pos in enumerate(range(first_laser_pos, last_laser_pos)):
-        t = round(intercept + pos * coef)
-        resliced[i] = stack[
-            t, :, pos - window_offset : pos - window_offset + window_size
-        ]
+    for t in range(n_t):
+        laser_pos = coef * t + intercept
+        laser_pos = round(laser_pos)
+        if laser_pos > width:
+            break
+        start = laser_pos - window_offset
+        stop = laser_pos - window_offset + window_size
+
         positions = pd.concat(
             (
                 positions,
                 pd.DataFrame(
                     {
                         "Time frame": (t,),
-                        "Laser position": (pos,),
-                        "Window start": (pos - window_offset,),
-                        "Window stop": (pos - window_offset + window_size,),
+                        "Laser position": (laser_pos,),
+                        "Window start": (laser_pos - window_offset,),
+                        "Window stop": (
+                            laser_pos - window_offset + window_size,
+                        ),
                     }
                 ),
             )
         )
 
+        if (start < 0 and stop < 0) or (start >= width and stop >= width):
+            continue
+        elif start < 0 and stop > width:
+            raise ValueError("Window size too large for width of input stack.")
+        elif start < 0:
+            resliced[t, :, window_size - stop :] = stack[t, :, :stop]
+        elif stop > width:
+            resliced[t, :, : width - start] = stack[t, :, start:]
+        else:
+            resliced[t] = stack[t, :, start:stop]
     return resliced, positions
 
 

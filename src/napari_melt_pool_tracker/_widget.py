@@ -320,7 +320,7 @@ class MeltPoolTrackerQWidget(QWidget):
         self.window_size = min(
             self.window_size, stack.shape[2] - self.window_offset
         )
-        resliced, self.position_df = _utils._reslice_with_moving_window(
+        resliced, self.position_df = _utils.reslice_with_moving_window(
             stack=stack,
             coef=coef,
             intercept=intercept,
