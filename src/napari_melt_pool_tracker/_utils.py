@@ -101,7 +101,9 @@ def _reslice_with_moving_window(
         round((-intercept) / coef), width - window_size + window_offset
     )
     if last_laser_pos - first_laser_pos < 1:
-        raise ValueError("Window size and/or offset too large.")
+        raise ValueError(
+            f"Window size and/or offset too large. Offset is {window_offset}. Size is {window_size}. Width of image is {width}. Intercept is {intercept}. Coef is {coef}."
+        )
 
     resliced = np.zeros(
         (last_laser_pos - first_laser_pos, height, window_size),
@@ -144,19 +146,17 @@ def determine_laser_speed_and_position_from_points(
     point1: (float, float), point2: (float, float)
 ) -> (float, float):
     """
-    For some experiments the automatic detection of
-    laser speed and positions does not work.
-    In these cases the intercept can be determined
-    from two manually specified points. The points
-    can be chosen from the file saved by
-    'determine_laser_speed_and_position'.
+    Calculates the coefficient and intercept of the line
+    that passes throught he two specified points.
 
     Parameters
     ----------
     point1 : (float, float)
-        Coordinates of point 1.
+        Coordinates of point 1. The first coordinate is y (height)
+        and the second component is x (widht).
     point2 : (float, float)
-        Coordinates of point 2.
+        Coordinates of point 2. The first coordinate is y (height)
+        and the second component is x (widht).
 
     Returns
     -------
@@ -165,9 +165,9 @@ def determine_laser_speed_and_position_from_points(
     intercpet : float
         Intercept of the line between the points.
     """
-    coef = (point2[1] - point1[1]) / (point2[0] - point1[0])
-    intercept1 = point1[1] - coef * point1[0]
-    intercept2 = point2[1] - coef * point2[0]
+    coef = (point2[0] - point1[0]) / (point2[1] - point1[1])
+    intercept1 = point1[0] - coef * point1[1]
+    intercept2 = point2[0] - coef * point2[1]
     return coef, np.mean((intercept1, intercept2))
 
 

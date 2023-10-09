@@ -310,7 +310,7 @@ class MeltPoolTrackerQWidget(QWidget):
             coef,
             intercept,
         ) = _utils.determine_laser_speed_and_position_from_points(
-            points[:, 0], points[:, 1]
+            points[0], points[1]
         )
 
         left_margin = self.window_groupbox.sliders["Left margin"].value()
