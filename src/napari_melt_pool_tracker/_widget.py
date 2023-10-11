@@ -80,18 +80,7 @@ class MeltPoolTrackerQWidget(QWidget):
         #####################
         self.speed_pos_groupbox = StepWidget(
             name="2. Determine laser speed and position",
-            include_auto_run_and_overwrite=True,
-            sliders={
-                "Median filter img": (1, 49, 5),
-                "Median filter max": (1, 49, 9),
-            },
         )
-        self.speed_pos_groupbox.sliders[
-            "Median filter img"
-        ].valueChanged.connect(self._determine_laser_speed_and_position)
-        self.speed_pos_groupbox.sliders[
-            "Median filter max"
-        ].valueChanged.connect(self._determine_laser_speed_and_position)
         self.speed_pos_groupbox.btn.clicked.connect(
             self._determine_laser_speed_and_position
         )
@@ -103,16 +92,15 @@ class MeltPoolTrackerQWidget(QWidget):
             name="3. Reslice with moving window",
             include_auto_run_and_overwrite=True,
             sliders={
-                "Left margin": (10, 100, 30),
-                "Right margin": (10, 200, 100),
+                "Left margin": (10, 350, 30),
+                "Right margin": (10, 350, 100),
             },
         )
-        self.window_groupbox.sliders["Left margin"].valueChanged.connect(
-            self._reslice_with_moving_window
+        self.window_groupbox.auto_run_cb.stateChanged.connect(
+            self._reslice_auto_run
         )
-        self.window_groupbox.sliders["Right margin"].valueChanged.connect(
-            self._reslice_with_moving_window
-        )
+        # Connect slider to match default of auto run checked
+        self._reslice_auto_run()
         self.window_groupbox.btn.clicked.connect(
             self._reslice_with_moving_window
         )
@@ -129,15 +117,11 @@ class MeltPoolTrackerQWidget(QWidget):
                 "Kernel x": (1, 15, 3),
             },
         )
-        self.filter_groupbox.sliders["Kernel t"].valueChanged.connect(
-            self._filter
+        self.filter_groupbox.auto_run_cb.stateChanged.connect(
+            self._filter_auto_run
         )
-        self.filter_groupbox.sliders["Kernel y"].valueChanged.connect(
-            self._filter
-        )
-        self.filter_groupbox.sliders["Kernel x"].valueChanged.connect(
-            self._filter
-        )
+        # Connect slider to match default of auto run checked
+        self._filter_auto_run()
         self.filter_groupbox.btn.clicked.connect(self._filter)
 
         #####################
@@ -223,69 +207,36 @@ class MeltPoolTrackerQWidget(QWidget):
             layer = selected_layers.pop()
             self.parameters["name"] = layer.name
 
-        if self.speed_pos_groupbox.overwrite_cb.isChecked():
-            layer_names = [
-                f"{self.parameters['name']}_proj",
-                f"{self.parameters['name']}_points",
-                f"{self.parameters['name']}_line",
-            ]
-            for layer_name in layer_names:
-                if layer_name in self.viewer.layers:
-                    self.viewer.layers.remove(layer_name)
+        layer_names = [
+            f"{self.parameters['name']}_proj",
+            f"{self.parameters['name']}_line",
+        ]
+        for layer_name in layer_names:
+            if layer_name in self.viewer.layers:
+                self.viewer.layers.remove(layer_name)
 
         stack = self.viewer.layers[self.parameters["name"]].data
 
-        kernel_size_img = self.speed_pos_groupbox.sliders[
-            "Median filter img"
-        ].value()
-        kernel_size_max = self.speed_pos_groupbox.sliders[
-            "Median filter max"
-        ].value()
-        # Make kernel sizes odd
-        if kernel_size_img % 2 == 0:
-            kernel_size_img -= 1
-        if kernel_size_max % 2 == 0:
-            kernel_size_max -= 1
-
         (
             proj_resliced,
-            maxima,
+            proj_resliced_median,
+            proj_resliced_avg,
             coef,
             intercept,
-        ) = _utils.determine_laser_speed_and_position(
-            stack,
-            kernel_size_img=kernel_size_img,
-            kernel_size_max=kernel_size_max,
-        )
+        ) = _utils.determine_laser_speed_and_position(stack)
 
-        y0 = 0
-        x0 = (y0 - intercept) / coef
-        if x0 < 0:
-            x0 = 0
-            y0 = intercept
-        elif x0 > proj_resliced.shape[1]:
-            x0 = proj_resliced.shape[1]
-            y0 = coef * x0 + intercept
+        x0, x1 = 0, proj_resliced.shape[1]
+        y0 = coef * x0 + intercept
+        y1 = coef * x1 + intercept
 
-        y1 = proj_resliced.shape[0]
-        x1 = (y1 - intercept) / coef
-        if x1 < 0:
-            x1 = 0
-            y1 = intercept
-        elif x1 > proj_resliced.shape[0]:
-            x1 = proj_resliced.shape[0]
-            y1 = coef * x1 + intercept
-
-        self.points = np.stack([maxima, np.arange(len(maxima))], axis=-1)
         self.viewer.add_image(
             proj_resliced, name=f"{self.parameters['name']}_proj"
         )
-        self.viewer.add_points(
-            data=self.points,
-            face_color="cyan",
-            size=8,
-            opacity=0.2,
-            name=f"{self.parameters['name']}_points",
+        self.viewer.add_image(
+            proj_resliced_median, name=f"{self.parameters['name']}_proj_median"
+        )
+        self.viewer.add_image(
+            proj_resliced_avg, name=f"{self.parameters['name']}_proj_avg"
         )
         self.viewer.add_shapes(
             data=[[y0, x0], [y1, x1]],
@@ -296,6 +247,22 @@ class MeltPoolTrackerQWidget(QWidget):
             name=f"{self.parameters['name']}_line",
         )
         self.viewer.layers[self.parameters["name"]].visible = False
+
+    def _reslice_auto_run(self):
+        if self.window_groupbox.auto_run_cb.isChecked():
+            self.window_groupbox.sliders["Left margin"].valueChanged.connect(
+                self._reslice_with_moving_window
+            )
+            self.window_groupbox.sliders["Right margin"].valueChanged.connect(
+                self._reslice_with_moving_window
+            )
+        else:
+            self.window_groupbox.sliders[
+                "Left margin"
+            ].valueChanged.disconnect()
+            self.window_groupbox.sliders[
+                "Right margin"
+            ].valueChanged.disconnect()
 
     def _reslice_with_moving_window(self):
         stack = self.viewer.layers[f"{self.parameters['name']}"].data
@@ -355,7 +322,6 @@ class MeltPoolTrackerQWidget(QWidget):
         )
         self.viewer.layers[f"{self.parameters['name']}"].visible = False
         self.viewer.layers[f"{self.parameters['name']}_proj"].visible = False
-        self.viewer.layers[f"{self.parameters['name']}_points"].visible = False
         self.viewer.layers[f"{self.parameters['name']}_line"].visible = False
 
     def _filter(self):
@@ -374,11 +340,26 @@ class MeltPoolTrackerQWidget(QWidget):
         )
         self.viewer.layers[f"{self.parameters['name']}"].visible = False
         self.viewer.layers[f"{self.parameters['name']}_proj"].visible = False
-        self.viewer.layers[f"{self.parameters['name']}_points"].visible = False
         self.viewer.layers[f"{self.parameters['name']}_line"].visible = False
         self.viewer.layers[
             f"{self.parameters['name']}_resliced"
         ].visible = False
+
+    def _filter_auto_run(self):
+        if self.filter_groupbox.auto_run_cb.isChecked():
+            self.filter_groupbox.sliders["Kernel t"].valueChanged.connect(
+                self._filter
+            )
+            self.filter_groupbox.sliders["Kernel y"].valueChanged.connect(
+                self._filter
+            )
+            self.filter_groupbox.sliders["Kernel x"].valueChanged.connect(
+                self._filter
+            )
+        else:
+            self.filter_groupbox.sliders["Kernel t"].valueChanged.disconnect()
+            self.filter_groupbox.sliders["Kernel y"].valueChanged.disconnect()
+            self.filter_groupbox.sliders["Kernel x"].valueChanged.disconnect()
 
     def _calculate_radial_gradient(self):
         stack = self.viewer.layers[
@@ -393,7 +374,6 @@ class MeltPoolTrackerQWidget(QWidget):
         )
         self.viewer.layers[f"{self.parameters['name']}"].visible = False
         self.viewer.layers[f"{self.parameters['name']}_proj"].visible = False
-        self.viewer.layers[f"{self.parameters['name']}_points"].visible = False
         self.viewer.layers[f"{self.parameters['name']}_line"].visible = False
         self.viewer.layers[
             f"{self.parameters['name']}_resliced"

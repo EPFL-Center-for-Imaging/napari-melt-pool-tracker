@@ -2,16 +2,10 @@ import collections
 
 import numpy as np
 import pandas as pd
-import scipy
 import skimage
-import sklearn.svm
 
 
-def determine_laser_speed_and_position(
-    stack,
-    kernel_size_img=5,
-    kernel_size_max=9,
-):
+def determine_laser_speed_and_position(stack):
     """
     Infers the laser position and speed by fitting a
     line in the spatio tempol resliced version of the
@@ -22,39 +16,39 @@ def determine_laser_speed_and_position(
     stack: np.ndarray
         The full size original images with one laser pass
         from right to left.
-    kernel_size_img: int
-        The length of the median filter applied along the
-        direction of the laser.
-    kernel_size_max: int
-        The length of the median filter applied to the maxima.
 
     Returns
     -------
+    proj_resliced : numpy array
+        Resliced image with the height of the image cores
     coef : float
         The coefficient determining the slope of the line fitted.
     intecept : float
         The intercept of the line fitted.
     """
+    # stack_median = stack / np.median(stack, axis=0)[np.newaxis, :, :]
+    stack_mean = stack / np.mean(stack, axis=0)[np.newaxis, :, :]
     resliced = np.swapaxes(stack, 0, 2)
+    # resliced_median = np.swapaxes(stack_median, 0, 2)
+    resliced_mean = np.swapaxes(stack_mean, 0, 2)
     proj_resliced = np.max(resliced, axis=1)
-    footprint = (
-        np.eye(kernel_size_img, dtype=np.uint8)[:, ::-1]
-        + np.eye(kernel_size_img, dtype=np.uint8, k=1)[:, ::-1]
-        + np.eye(kernel_size_img, dtype=np.uint8, k=-1)[:, ::-1]
+    # proj_resliced_median = np.max(resliced_median, axis=1)
+    proj_resliced_mean = np.max(resliced_mean, axis=1)
+    proj_resliced_median = (
+        proj_resliced / np.median(proj_resliced, axis=1)[:, np.newaxis]
     )
-    proj_resliced = skimage.filters.median(proj_resliced, footprint=footprint)
-    proj_resliced = skimage.filters.sobel_h(proj_resliced)
-    # proj_resliced = proj_resliced[10:]
-    maxima = proj_resliced.argmax(0)  # + 10
-    maxima = scipy.signal.medfilt(maxima, kernel_size=kernel_size_max)
-
-    x = np.arange(len(maxima))
-    svm = sklearn.svm.SVR(kernel="linear")
-    svm.fit(x[:, np.newaxis], maxima)
-
-    intercept = svm.intercept_[0]
-    coef = svm.coef_[0][0]
-    return proj_resliced, maxima, coef, intercept
+    # proj_resliced_mean = (
+    #     proj_resliced / np.mean(proj_resliced, axis=1)[:, np.newaxis]
+    # )
+    intercept = 0
+    coef = proj_resliced.shape[0] / proj_resliced.shape[1]
+    return (
+        proj_resliced,
+        proj_resliced_median,
+        proj_resliced_mean,
+        coef,
+        intercept,
+    )
 
 
 def reslice_with_moving_window(
