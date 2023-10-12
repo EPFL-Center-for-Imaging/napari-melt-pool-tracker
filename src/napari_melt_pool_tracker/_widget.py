@@ -9,6 +9,7 @@ Replace code below according to your needs.
 
 import napari_cursor_tracker
 import numpy as np
+import scipy
 import skimage
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
@@ -383,10 +384,16 @@ class MeltPoolTrackerQWidget(QWidget):
         kernel_t = self.filter_groupbox.sliders["Kernel t"].value()
         kernel_y = self.filter_groupbox.sliders["Kernel y"].value()
         kernel_x = self.filter_groupbox.sliders["Kernel x"].value()
-        filtered = skimage.filters.median(
-            filtered, np.ones((kernel_t, kernel_y, kernel_x))
+        filtered = scipy.ndimage.median_filter(
+            filtered, (kernel_t, kernel_y, kernel_x)
         )
-        self.viewer.add_image(filtered, name=f"{name}_filtered")
+        filtered_name = f"{name}_filtered"
+        if (
+            self.filter_groupbox.overwrite_cb.isChecked()
+            and filtered_name in self.viewer.layers
+        ):
+            self.viewer.layers.remove(filtered_name)
+        self.viewer.add_image(filtered, name=filtered_name)
         self._hide_old_layers([f"{name}_filtered"])
 
     def _filter_auto_run(self):
