@@ -32,7 +32,7 @@ class StepWidget(QGroupBox):
         self,
         name,
         include_auto_run_and_overwrite=False,
-        comboboxs=("Input"),
+        comboboxs=("Input",),
         sliders=None,
     ):
         """
