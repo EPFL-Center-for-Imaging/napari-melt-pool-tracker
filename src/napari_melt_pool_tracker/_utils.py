@@ -119,33 +119,35 @@ def reslice_with_moving_window(
             break
         start = laser_pos - window_offset
         stop = laser_pos - window_offset + window_size
-
-        positions = pd.concat(
-            (
-                positions,
-                pd.DataFrame(
-                    {
-                        "Time frame": (t,),
-                        "Laser position": (laser_pos,),
-                        "Window start": (laser_pos - window_offset,),
-                        "Window stop": (
-                            laser_pos - window_offset + window_size,
-                        ),
-                    }
-                ),
-            )
+        current_positions = pd.DataFrame(
+            {
+                "Time frame": (t,),
+                "Laser position": (laser_pos,),
+            }
         )
-
         if (start < 0 and stop < 0) or (start >= width and stop >= width):
             continue
         elif start < 0 and stop > width:
             raise ValueError("Window size too large for width of input stack.")
         elif start < 0:
             resliced[t, :, window_size - stop :] = stack[t, :, :stop]
+            current_positions["Window start"] = 0
+            current_positions["Window stop"] = stop
         elif stop > width:
             resliced[t, :, : width - start] = stack[t, :, start:]
+            current_positions["Window start"] = start
+            current_positions["Window stop"] = stack.shape[2] - 1
         else:
             resliced[t] = stack[t, :, start:stop]
+            current_positions["Window start"] = start
+            current_positions["Window stop"] = stop
+
+        positions = pd.concat(
+            (
+                positions,
+                current_positions,
+            )
+        )
     return resliced, positions
 
 

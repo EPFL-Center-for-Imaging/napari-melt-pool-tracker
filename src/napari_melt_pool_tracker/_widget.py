@@ -340,7 +340,7 @@ class MeltPoolTrackerQWidget(QWidget):
         self.window_size = min(
             self.window_size, stack.shape[2] - self.window_offset
         )
-        resliced, self.position_df = _utils.reslice_with_moving_window(
+        resliced, position_df = _utils.reslice_with_moving_window(
             stack=stack,
             coef=coef,
             intercept=intercept,
@@ -348,25 +348,56 @@ class MeltPoolTrackerQWidget(QWidget):
             window_size=self.window_size,
         )
 
-        n_frames = resliced.shape[0]
-        ts = np.arange(n_frames)
-        xs = np.ones(n_frames) * self.window_offset
-        ys = np.zeros(n_frames)
-        coord0 = np.stack([ts, ys, xs], axis=-1)
-        ys = np.ones(n_frames) * (resliced.shape[1] - 1)
-        coord1 = np.stack([ts, ys, xs], axis=-1)
-        coords = np.stack([coord0, coord1], axis=1)
+        # n_frames = resliced.shape[0]
+        # ts = np.arange(n_frames)
+        # ys_top = np.zeros(n_frames)
+        # ys_bottom = np.ones(n_frames) * (resliced.shape[1] - 1)
 
+        # # Calculate coordinates for resliced laser position
+        # xs = np.ones(n_frames) * self.window_offset
+        # coord0 = np.stack([ts, ys_top, xs], axis=-1)
+        # coord1 = np.stack([ts, ys_bottom, xs], axis=-1)
+        # resliced_laser_coords = np.stack([coord0, coord1], axis=1)
+        resliced_laser_coords = np.stack(
+            [
+                [0, resliced.shape[1] - 1],
+                [self.window_offset, self.window_offset],
+            ],
+            axis=1,
+        )
+
+        window_lines = []
+        for line_name in ["Window start", "Window stop", "Laser position"]:
+            ts = position_df["Time frame"]
+            xs = position_df[line_name]
+            ys_top = np.zeros(len(ts))
+            ys_bottom = np.ones(len(ts)) * (stack.shape[1] - 1)
+            tops = np.stack([ts, ys_top, xs], axis=-1)
+            bottoms = np.stack([ts, ys_bottom, xs], axis=-1)
+            window_lines.append(np.stack([tops, bottoms], axis=1))
+        window_lines = np.concatenate(window_lines, axis=0)
+
+        window_name = f"{name}_window_coordinates"
         resliced_name = f"{name}_resliced"
-        pos_name = f"{name}_laser_pos"
+        pos_name = f"{name}_laser_pos_resliced"
         if self.window_groupbox.overwrite_cb.isChecked():
+            if window_name in self.viewer.layers:
+                self.viewer.layers.remove(window_name)
             if resliced_name in self.viewer.layers:
                 self.viewer.layers.remove(resliced_name)
             if pos_name in self.viewer.layers:
                 self.viewer.layers.remove(pos_name)
+        self.viewer.add_shapes(
+            data=window_lines,
+            shape_type="line",
+            edge_color="blue",
+            edge_width=1,
+            opacity=0.5,
+            name=window_name,
+        )
         self.viewer.add_image(resliced, name=resliced_name)
         self.viewer.add_shapes(
-            data=coords,
+            data=resliced_laser_coords,
             shape_type="line",
             edge_color="blue",
             edge_width=1,
