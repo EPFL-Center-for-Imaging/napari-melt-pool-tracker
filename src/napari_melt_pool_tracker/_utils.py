@@ -5,7 +5,7 @@ import pandas as pd
 import skimage
 
 
-def determine_laser_speed_and_position(stack):
+def determine_laser_speed_and_position(stack, mode):
     """
     Infers the laser position and speed by fitting a
     line in the spatio tempol resliced version of the
@@ -16,6 +16,8 @@ def determine_laser_speed_and_position(stack):
     stack: np.ndarray
         The full size original images with one laser pass
         from right to left.
+    mdoe: string
+        The way the projection is computed.
 
     Returns
     -------
@@ -26,26 +28,21 @@ def determine_laser_speed_and_position(stack):
     intecept : float
         The intercept of the line fitted.
     """
-    # stack_median = stack / np.median(stack, axis=0)[np.newaxis, :, :]
-    stack_mean = stack / np.mean(stack, axis=0)[np.newaxis, :, :]
+    modes = ["Pre mean", "Post median", "Default"]
+    if mode not in modes:
+        raise ValueError(f"Mode has to be in {modes}. You specified {mode}.")
+    if mode == "Pre mean":
+        stack = stack / np.mean(stack, axis=0)[np.newaxis, :, :]
     resliced = np.swapaxes(stack, 0, 2)
-    # resliced_median = np.swapaxes(stack_median, 0, 2)
-    resliced_mean = np.swapaxes(stack_mean, 0, 2)
     proj_resliced = np.max(resliced, axis=1)
-    # proj_resliced_median = np.max(resliced_median, axis=1)
-    proj_resliced_mean = np.max(resliced_mean, axis=1)
-    proj_resliced_median = (
-        proj_resliced / np.median(proj_resliced, axis=1)[:, np.newaxis]
-    )
-    # proj_resliced_mean = (
-    #     proj_resliced / np.mean(proj_resliced, axis=1)[:, np.newaxis]
-    # )
+    if mode == "Post median":
+        proj_resliced = (
+            proj_resliced / np.median(proj_resliced, axis=1)[:, np.newaxis]
+        )
     intercept = 0
     coef = proj_resliced.shape[0] / proj_resliced.shape[1]
     return (
         proj_resliced,
-        proj_resliced_median,
-        proj_resliced_mean,
         coef,
         intercept,
     )
