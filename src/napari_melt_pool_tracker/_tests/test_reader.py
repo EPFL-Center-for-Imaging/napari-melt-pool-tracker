@@ -16,6 +16,7 @@ def beamline(request):
     return request.param
 
 
+# tmp_path is a pytest fixture
 @pytest.fixture
 def random_h5_file(tmp_path, seed, beamline):
     """
@@ -51,7 +52,6 @@ def random_h5_file(tmp_path, seed, beamline):
     return original_data, test_file
 
 
-# tmp_path is a pytest fixture
 def test_reader(random_h5_file):
     """Test the h5 file reader."""
 
@@ -69,6 +69,10 @@ def test_reader(random_h5_file):
 
     # make sure it's the same as it started
     np.testing.assert_allclose(original_data, layer_data_tuple[0])
+
+    # Image stacks are not supported and one h5 file should be loaded at a time
+    with pytest.raises(ValueError):
+        napari_get_reader([test_file, test_file])
 
 
 def test_get_reader_pass():

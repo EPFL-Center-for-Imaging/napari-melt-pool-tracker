@@ -27,10 +27,9 @@ def napari_get_reader(path):
         same path or list of paths, and returns a list of layer data tuples.
     """
     if isinstance(path, list):
-        # reader plugins may be handed single path, or a list of paths.
-        # if it is a list, it is assumed to be an image stack...
-        # so we are only going to look at the first file.
-        path = path[0]
+        raise ValueError(
+            "The napari-melt-pool-tracker plugin does not suport loading image stacks. Please load one h5 file at a time."
+        )
 
     # if we know we cannot read the file, we immediately return None.
     if not path.endswith(".h5"):
