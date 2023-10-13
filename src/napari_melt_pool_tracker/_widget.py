@@ -84,22 +84,10 @@ class MeltPoolTrackerQWidget(QWidget):
         self.comboboxs = []
 
         #####################
-        # Spliting
-        #####################
-        self.split_groupbox = StepWidget(name="1. Split")
-        self.split_groupbox.btn.clicked.connect(self._split)
-        self._populate_combobox(
-            self.split_groupbox.comboboxs["Input"], "image"
-        )
-        self.comboboxs.append(
-            (self.split_groupbox.comboboxs["Input"], "image")
-        )
-
-        #####################
         # Laser position
         #####################
         self.speed_pos_groupbox = StepWidget(
-            name="2. Determine laser speed and position",
+            name="1. Determine laser speed and position",
         )
         self.speed_pos_groupbox.btn.clicked.connect(
             self._determine_laser_speed_and_position
@@ -115,7 +103,7 @@ class MeltPoolTrackerQWidget(QWidget):
         # Reslice
         #####################
         self.window_groupbox = StepWidget(
-            name="3. Reslice with moving window",
+            name="2. Reslice with moving window",
             include_auto_run_and_overwrite=True,
             comboboxs=["Stack", "Line"],
             sliders={
@@ -148,7 +136,7 @@ class MeltPoolTrackerQWidget(QWidget):
         # Denoise image
         #####################
         self.filter_groupbox = StepWidget(
-            name="4. Filter image",
+            name="3. Filter image",
             include_auto_run_and_overwrite=True,
             sliders={
                 "Kernel t": (1, 15, 7),
@@ -172,7 +160,7 @@ class MeltPoolTrackerQWidget(QWidget):
         #####################
         # Radial gradient
         #####################
-        self.radial_groupbox = StepWidget(name="5. Calculate radial gradient")
+        self.radial_groupbox = StepWidget(name="4. Calculate radial gradient")
         self.radial_groupbox.btn.clicked.connect(
             self._calculate_radial_gradient
         )
@@ -187,7 +175,7 @@ class MeltPoolTrackerQWidget(QWidget):
         # Surface annotation
         #####################
         self.annotate_surface_groupbox = StepWidget(
-            name="6. Annotate surface features",
+            name="5. Annotate surface features",
             comboboxs=["Input", "Surface"],
         )
         self.annotate_surface_groupbox.btn.clicked.connect(
@@ -209,7 +197,7 @@ class MeltPoolTrackerQWidget(QWidget):
         #####################
         # Depth annotation
         #####################
-        annotate_depth_groupbox = QGroupBox("7. Annotate depths")
+        annotate_depth_groupbox = QGroupBox("6. Annotate depths")
         annotate_depth_layout = QVBoxLayout()
         annotate_depth_groupbox.setLayout(annotate_depth_layout)
         annotate_depth_layout.addWidget(
@@ -229,7 +217,6 @@ class MeltPoolTrackerQWidget(QWidget):
         self.scroll_content.setLayout(self.scroll_layout)
 
         # Add individual widges to plugin
-        self.scroll_layout.addWidget(self.split_groupbox)
         self.scroll_layout.addWidget(self.speed_pos_groupbox)
         self.scroll_layout.addWidget(self.window_groupbox)
         self.scroll_layout.addWidget(self.filter_groupbox)
@@ -243,24 +230,6 @@ class MeltPoolTrackerQWidget(QWidget):
         self.viewer.layers.events.removed.connect(self._on_removed_layer)
 
         self.parameters = {}
-
-    def _split(self):
-        selected_layers = self.viewer.layers.selection
-        t = self.viewer.dims.current_step[0]
-        self.parameters["split_t"] = t
-        layer = selected_layers.pop()
-        data, meta, layer_type = layer.as_layer_data_tuple()
-        if layer_type != "image":
-            raise ValueError(
-                "Can only split image layers. You have selected a layer of type {layer_type}."
-            )
-        data0 = data[:t]
-        data1 = data[t:]
-        name = meta["name"]
-        meta["name"] = name + "_0"
-        self.viewer.add_image(data0, **meta)
-        meta["name"] = name + "_1"
-        self.viewer.add_image(data1, **meta)
 
     def _determine_laser_speed_and_position(self):
         name = self.speed_pos_groupbox.comboboxs["Input"].currentText()

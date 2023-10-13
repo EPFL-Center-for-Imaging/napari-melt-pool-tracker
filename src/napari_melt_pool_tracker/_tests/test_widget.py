@@ -16,28 +16,24 @@ def test_example_q_widget(make_napari_viewer, capsys):
     widget = MeltPoolTrackerQWidget(viewer)
 
     # test widget methods
-    widget.split_groupbox.comboboxs["Input"].setCurrentText("test_image")
-    widget._split()
-    widget.speed_pos_groupbox.comboboxs["Input"].setCurrentText("test_image_0")
+    widget.speed_pos_groupbox.comboboxs["Input"].setCurrentText("test_image")
     widget._determine_laser_speed_and_position()
-    widget.window_groupbox.comboboxs["Stack"].setCurrentText("test_image_0")
-    widget.window_groupbox.comboboxs["Line"].setCurrentText(
-        "test_image_0_line"
-    )
+    widget.window_groupbox.comboboxs["Stack"].setCurrentText("test_image")
+    widget.window_groupbox.comboboxs["Line"].setCurrentText("test_image_line")
     widget._reslice_with_moving_window()
     widget.filter_groupbox.comboboxs["Input"].setCurrentText(
-        "test_image_0_resliced"
+        "test_image_resliced"
     )
     widget._filter()
     widget.radial_groupbox.comboboxs["Input"].setCurrentText(
-        "test_image_0_resliced_filtered"
+        "test_image_resliced_filtered"
     )
     widget._calculate_radial_gradient()
     widget.annotate_surface_groupbox.comboboxs["Input"].setCurrentText(
-        "test_image_0_resliced_filtered_radial_gradient"
+        "test_image_resliced_filtered_radial_gradient"
     )
     widget.annotate_surface_groupbox.comboboxs["Surface"].setCurrentText(
-        "test_image_0_resliced_filtered"
+        "test_image_resliced_filtered"
     )
     widget._annotate_surface_features()
 
