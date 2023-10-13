@@ -8,7 +8,9 @@ from napari_melt_pool_tracker import MeltPoolTrackerQWidget
 def test_example_q_widget(make_napari_viewer, capsys):
     # make viewer and add an image layer using our fixture
     viewer = make_napari_viewer()
-    viewer.add_image(np.random.random((100, 100, 100)), name="test_image")
+    test_data = np.zeros((100, 100, 100))
+    test_data[:, 50:, :] = 255
+    viewer.add_image(test_data, name="test_image")
 
     # create our widget, passing in the viewer
     widget = MeltPoolTrackerQWidget(viewer)

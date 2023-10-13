@@ -46,7 +46,7 @@ def window_size(request):
     return request.param
 
 
-@pytest.fixture(params=[(2000, 200, 2016), (18000, 184, 1024)])
+@pytest.fixture(params=[(2000, 200, 2016), (4000, 184, 1024)])
 def stack_shape(request):
     return request.param
 
