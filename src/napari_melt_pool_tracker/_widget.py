@@ -164,7 +164,10 @@ class MeltPoolTrackerQWidget(QWidget):
         #####################
         # Radial gradient
         #####################
-        self.radial_groupbox = StepWidget(name="4. Calculate radial gradient")
+        self.radial_groupbox = StepWidget(
+            name="4. Calculate radial gradient",
+            sliders={"Position": (0, 100, 50)},
+        )
         self.radial_groupbox.btn.clicked.connect(
             self._calculate_radial_gradient
         )
@@ -416,8 +419,14 @@ class MeltPoolTrackerQWidget(QWidget):
     def _calculate_radial_gradient(self):
         name = self.radial_groupbox.comboboxes["Input"].currentText()
         stack = self.viewer.layers[f"{name}"].data
+        xpos = (
+            self.radial_groupbox.sliders["Position"].value()
+            / 100
+            * stack.shape[2]
+        )
+        xpos = round(xpos)
         radial_gradient_stack = _utils.calculate_radial_gradient(
-            stack, xpos=self.window_offset
+            stack, xpos=xpos
         )
         self.viewer.add_image(
             radial_gradient_stack,
@@ -436,17 +445,17 @@ class MeltPoolTrackerQWidget(QWidget):
         edges = self.viewer.layers[stack_name].data
         surface_image = _utils.get_surface_image(stack, edges)
         self.viewer.add_image(surface_image)
-        self.viewer.add_shapes(name="Front Edge")
-        self.viewer.add_shapes(name="Back Edge")
-        self.viewer.add_shapes(name="DZ front Edge")
-        self.viewer.add_shapes(name="DZ back Edge")
+        self.viewer.add_shapes(name="MP front edge")
+        self.viewer.add_shapes(name="MP back edge")
+        self.viewer.add_shapes(name="DZ front edge")
+        self.viewer.add_shapes(name="DZ back edge")
         self._hide_old_layers(
             [
                 "surface_image",
-                "Front Edge",
-                "Back Edge",
-                "DZ front Edge",
-                "DZ back Edge",
+                "MP front edge",
+                "MP back edge",
+                "DZ front edge",
+                "DZ back edge",
             ]
         )
 
