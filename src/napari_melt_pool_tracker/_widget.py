@@ -7,6 +7,8 @@ see: https://napari.org/stable/plugins/guides.html?#widgets
 Replace code below according to your needs.
 """
 
+import magicgui
+import napari
 import napari_cursor_tracker
 import numpy as np
 import scipy
@@ -14,7 +16,6 @@ import skimage
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QGridLayout,
     QGroupBox,
     QLabel,
@@ -31,9 +32,10 @@ from napari_melt_pool_tracker import _utils
 class StepWidget(QGroupBox):
     def __init__(
         self,
+        viewer,
         name,
         include_auto_run_and_overwrite=False,
-        comboboxes=("Input",),
+        comboboxes=(("Input", napari.layers.Image),),
         sliders=None,
     ):
         """
@@ -46,6 +48,7 @@ class StepWidget(QGroupBox):
             sliders = {}
 
         super().__init__(name)
+        self.viewer = viewer
         self.layout = QGridLayout()
         self.setLayout(self.layout)
         self.comboboxes = {}
@@ -60,10 +63,24 @@ class StepWidget(QGroupBox):
             self.layout.addWidget(self.overwrite_cb, row, 2)
             row += 1
 
-        for name in comboboxes:
-            self.comboboxes[name] = QComboBox()
+        for name, item_type in comboboxes:
+            if item_type in [napari.layers.Image, napari.layers.Shapes]:
+                self.comboboxes[name] = magicgui.widgets.create_widget(
+                    annotation=item_type
+                )
+                self.viewer.layers.events.inserted.connect(
+                    self.comboboxes[name].reset_choices
+                )
+                self.viewer.layers.events.removed.connect(
+                    self.comboboxes[name].reset_choices
+                )
+            else:
+                self.comboboxes[name] = magicgui.widgets.create_widget(
+                    widget_type=magicgui.widgets.ComboBox
+                )
+
             self.layout.addWidget(QLabel(name), row, 1)
-            self.layout.addWidget(self.comboboxes[name], row, 2)
+            self.layout.addWidget(self.comboboxes[name].native, row, 2)
             row += 1
         for name, params in sliders.items():
             self.sliders[name] = QSlider(Qt.Horizontal)
@@ -81,35 +98,35 @@ class MeltPoolTrackerQWidget(QWidget):
     def __init__(self, napari_viewer):
         super().__init__()
         self.viewer = napari_viewer
-        self.comboboxes = []
 
         #####################
         # Laser position
         #####################
         self.speed_pos_groupbox = StepWidget(
+            viewer=self.viewer,
             name="1. Determine laser speed and position",
-            comboboxes=["Input", "Mode"],
+            comboboxes=[("Input", napari.layers.Image), ("Mode", str)],
         )
-        self.speed_pos_groupbox.comboboxes["Mode"].addItem("Default")
-        self.speed_pos_groupbox.comboboxes["Mode"].addItem("Pre mean")
-        self.speed_pos_groupbox.comboboxes["Mode"].addItem("Post median")
+        self.speed_pos_groupbox.comboboxes["Mode"].native.addItem("Default")
+        self.speed_pos_groupbox.comboboxes["Mode"].native.addItem("Pre mean")
+        self.speed_pos_groupbox.comboboxes["Mode"].native.addItem(
+            "Post median"
+        )
         self.speed_pos_groupbox.btn.clicked.connect(
             self._determine_laser_speed_and_position
-        )
-        self._populate_combobox(
-            self.speed_pos_groupbox.comboboxes["Input"], "image"
-        )
-        self.comboboxes.append(
-            (self.speed_pos_groupbox.comboboxes["Input"], "image")
         )
 
         #####################
         # Reslice
         #####################
         self.window_groupbox = StepWidget(
+            viewer=self.viewer,
             name="2. Reslice with moving window",
             include_auto_run_and_overwrite=True,
-            comboboxes=["Stack", "Line"],
+            comboboxes=[
+                ("Stack", napari.layers.Image),
+                ("Line", napari.layers.Shapes),
+            ],
             sliders={
                 "Left margin": (10, 350, 30),
                 "Right margin": (10, 350, 100),
@@ -123,23 +140,12 @@ class MeltPoolTrackerQWidget(QWidget):
         self.window_groupbox.btn.clicked.connect(
             self._reslice_with_moving_window
         )
-        self._populate_combobox(
-            self.window_groupbox.comboboxes["Stack"], "image"
-        )
-        self.comboboxes.append(
-            (self.window_groupbox.comboboxes["Stack"], "image")
-        )
-        self._populate_combobox(
-            self.window_groupbox.comboboxes["Line"], "shapes"
-        )
-        self.comboboxes.append(
-            (self.window_groupbox.comboboxes["Line"], "shapes")
-        )
 
         #####################
         # Denoise image
         #####################
         self.filter_groupbox = StepWidget(
+            viewer=self.viewer,
             name="3. Filter image",
             include_auto_run_and_overwrite=True,
             sliders={
@@ -154,51 +160,32 @@ class MeltPoolTrackerQWidget(QWidget):
         # Connect slider to match default of auto run checked
         self._filter_auto_run()
         self.filter_groupbox.btn.clicked.connect(self._filter)
-        self._populate_combobox(
-            self.filter_groupbox.comboboxes["Input"], "image"
-        )
-        self.comboboxes.append(
-            (self.filter_groupbox.comboboxes["Input"], "image")
-        )
 
         #####################
         # Radial gradient
         #####################
         self.radial_groupbox = StepWidget(
+            viewer=self.viewer,
             name="4. Calculate radial gradient",
             sliders={"Position": (0, 100, 50)},
         )
         self.radial_groupbox.btn.clicked.connect(
             self._calculate_radial_gradient
         )
-        self._populate_combobox(
-            self.radial_groupbox.comboboxes["Input"], "image"
-        )
-        self.comboboxes.append(
-            (self.radial_groupbox.comboboxes["Input"], "image")
-        )
 
         #####################
         # Surface annotation
         #####################
         self.annotate_surface_groupbox = StepWidget(
+            viewer=self.viewer,
             name="5. Annotate surface features",
-            comboboxes=["Input", "Surface"],
+            comboboxes=[
+                ("Input", napari.layers.Image),
+                ("Surface", napari.layers.Image),
+            ],
         )
         self.annotate_surface_groupbox.btn.clicked.connect(
             self._annotate_surface_features
-        )
-        self._populate_combobox(
-            self.annotate_surface_groupbox.comboboxes["Input"], "image"
-        )
-        self.comboboxes.append(
-            (self.annotate_surface_groupbox.comboboxes["Input"], "image")
-        )
-        self._populate_combobox(
-            self.annotate_surface_groupbox.comboboxes["Surface"], "image"
-        )
-        self.comboboxes.append(
-            (self.annotate_surface_groupbox.comboboxes["Surface"], "image")
         )
 
         #####################
@@ -233,14 +220,12 @@ class MeltPoolTrackerQWidget(QWidget):
 
         self.scroll.setWidget(self.scroll_content)
 
-        self.viewer.layers.events.inserted.connect(self._on_inserted_layer)
-        self.viewer.layers.events.removed.connect(self._on_removed_layer)
-
         self.parameters = {}
 
     def _determine_laser_speed_and_position(self):
-        name = self.speed_pos_groupbox.comboboxes["Input"].currentText()
-        mode = self.speed_pos_groupbox.comboboxes["Mode"].currentText()
+        input_layer = self.speed_pos_groupbox.comboboxes["Input"].value
+        name = input_layer.name
+        mode = self.speed_pos_groupbox.comboboxes["Mode"].native.currentText()
         layer_names = [
             f"{name}_{mode}",
             f"{name}_line",
@@ -249,7 +234,7 @@ class MeltPoolTrackerQWidget(QWidget):
             if layer_name in self.viewer.layers:
                 self.viewer.layers.remove(layer_name)
 
-        stack = self.viewer.layers[name].data
+        stack = input_layer.data
 
         (
             proj_resliced,
@@ -270,7 +255,7 @@ class MeltPoolTrackerQWidget(QWidget):
             opacity=0.5,
             name=f"{name}_line",
         )
-        self.viewer.layers[name].visible = False
+        self._hide_old_layers(layer_names)
 
     def _reslice_auto_run(self):
         if self.window_groupbox.auto_run_cb.isChecked():
@@ -289,11 +274,13 @@ class MeltPoolTrackerQWidget(QWidget):
             ].valueChanged.disconnect()
 
     def _reslice_with_moving_window(self):
-        name = self.window_groupbox.comboboxes["Stack"].currentText()
-        line = self.window_groupbox.comboboxes["Line"].currentText()
+        stack_layer = self.window_groupbox.comboboxes["Stack"].value
+        line_layer = self.window_groupbox.comboboxes["Line"].value
+        name = stack_layer.name
+
         stack = self.viewer.layers[f"{name}"].data
 
-        shapes = self.viewer.layers[line].data
+        shapes = line_layer.data
         if len(shapes) > 1:
             raise ValueError("Shapes layer should only containe one shape.")
         if len(shapes) == 0:
@@ -321,16 +308,6 @@ class MeltPoolTrackerQWidget(QWidget):
             window_size=self.window_size,
         )
 
-        # n_frames = resliced.shape[0]
-        # ts = np.arange(n_frames)
-        # ys_top = np.zeros(n_frames)
-        # ys_bottom = np.ones(n_frames) * (resliced.shape[1] - 1)
-
-        # # Calculate coordinates for resliced laser position
-        # xs = np.ones(n_frames) * self.window_offset
-        # coord0 = np.stack([ts, ys_top, xs], axis=-1)
-        # coord1 = np.stack([ts, ys_bottom, xs], axis=-1)
-        # resliced_laser_coords = np.stack([coord0, coord1], axis=1)
         resliced_laser_coords = np.stack(
             [
                 [0, resliced.shape[1] - 1],
@@ -380,25 +357,27 @@ class MeltPoolTrackerQWidget(QWidget):
         self._hide_old_layers([resliced_name, pos_name])
 
     def _filter(self):
-        name = self.filter_groupbox.comboboxes["Input"].currentText()
-        stack = self.viewer.layers[name].data
+        input_layer = self.filter_groupbox.comboboxes["Input"].value
+        name = input_layer.name
+        stack = input_layer.data
         thresh = skimage.filters.threshold_otsu(stack)
         filtered = np.clip(stack, 0, thresh)
         filtered = filtered / np.max(filtered)
         kernel_t = self.filter_groupbox.sliders["Kernel t"].value()
         kernel_y = self.filter_groupbox.sliders["Kernel y"].value()
         kernel_x = self.filter_groupbox.sliders["Kernel x"].value()
+        name_filtered = f"{name}_filtered"
         filtered = scipy.ndimage.median_filter(
             filtered, (kernel_t, kernel_y, kernel_x)
         )
-        filtered_name = f"{name}_filtered"
+        filtered_name = name_filtered
         if (
             self.filter_groupbox.overwrite_cb.isChecked()
             and filtered_name in self.viewer.layers
         ):
             self.viewer.layers.remove(filtered_name)
         self.viewer.add_image(filtered, name=filtered_name)
-        self._hide_old_layers([f"{name}_filtered"])
+        self._hide_old_layers([name_filtered])
 
     def _filter_auto_run(self):
         if self.filter_groupbox.auto_run_cb.isChecked():
@@ -417,8 +396,9 @@ class MeltPoolTrackerQWidget(QWidget):
             self.filter_groupbox.sliders["Kernel x"].valueChanged.disconnect()
 
     def _calculate_radial_gradient(self):
-        name = self.radial_groupbox.comboboxes["Input"].currentText()
-        stack = self.viewer.layers[f"{name}"].data
+        input_layer = self.radial_groupbox.comboboxes["Input"].value
+        name = input_layer.name
+        stack = input_layer.data
         xpos = (
             self.radial_groupbox.sliders["Position"].value()
             / 100
@@ -428,21 +408,16 @@ class MeltPoolTrackerQWidget(QWidget):
         radial_gradient_stack = _utils.calculate_radial_gradient(
             stack, xpos=xpos
         )
+        name_radial_gradient = f"{name}_radial_gradient"
         self.viewer.add_image(
             radial_gradient_stack,
-            name=f"{name}_radial_gradient",
+            name=name_radial_gradient,
         )
-        self._hide_old_layers([f"{name}_radial_gradient"])
+        self._hide_old_layers([name_radial_gradient])
 
     def _annotate_surface_features(self):
-        surface_name = self.annotate_surface_groupbox.comboboxes[
-            "Surface"
-        ].currentText()
-        stack_name = self.annotate_surface_groupbox.comboboxes[
-            "Input"
-        ].currentText()
-        stack = self.viewer.layers[surface_name].data
-        edges = self.viewer.layers[stack_name].data
+        stack = self.annotate_surface_groupbox.comboboxes["Surface"].value.data
+        edges = self.annotate_surface_groupbox.comboboxes["Input"].value.data
         surface_image = _utils.get_surface_image(stack, edges)
         self.viewer.add_image(surface_image)
         self.viewer.add_shapes(name="MP front edge")
@@ -458,27 +433,6 @@ class MeltPoolTrackerQWidget(QWidget):
                 "DZ back edge",
             ]
         )
-
-    def _on_inserted_layer(self, event):
-        layer = event.value
-        for combobox, layer_type in self.comboboxes:
-            if self._val_layer_type(layer, layer_type):
-                combobox.addItem(layer.name)
-
-    def _on_removed_layer(self, event):
-        layer = event.value
-        for combobox, _ in self.comboboxes:
-            for index in range(combobox.count()):
-                if layer.name == combobox.itemText(index):
-                    combobox.removeItem(index)
-
-    def _val_layer_type(self, layer, layer_type):
-        return layer.as_layer_data_tuple()[2] == layer_type
-
-    def _populate_combobox(self, combobox, layer_type):
-        for layer in self.viewer.layers:
-            if self._val_layer_type(layer, layer_type):
-                combobox.addItem(layer.name)
 
     def _hide_old_layers(self, new_layer_names):
         for layer in self.viewer.layers:
