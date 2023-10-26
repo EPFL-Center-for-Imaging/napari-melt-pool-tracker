@@ -107,11 +107,9 @@ class MeltPoolTrackerQWidget(QWidget):
             name="1. Determine laser speed and position",
             comboboxes=[("Input", napari.layers.Image), ("Mode", str)],
         )
-        self.speed_pos_groupbox.comboboxes["Mode"].native.addItem("Default")
-        self.speed_pos_groupbox.comboboxes["Mode"].native.addItem("Pre mean")
-        self.speed_pos_groupbox.comboboxes["Mode"].native.addItem(
-            "Post median"
-        )
+        self.speed_pos_groupbox.comboboxes["Mode"].set_choice("Default")
+        self.speed_pos_groupbox.comboboxes["Mode"].set_choice("Pre mean")
+        self.speed_pos_groupbox.comboboxes["Mode"].set_choice("Post median")
         self.speed_pos_groupbox.btn.clicked.connect(
             self._determine_laser_speed_and_position
         )
