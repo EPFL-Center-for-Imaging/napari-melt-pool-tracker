@@ -405,11 +405,11 @@ class MeltPoolTrackerQWidget(QWidget):
             stack, xpos=xpos
         )
         name_radial_gradient = f"{name}_radial_gradient"
-        self.viewer.add_image(
+        layer = self.viewer.add_image(
             radial_gradient_stack,
             name=name_radial_gradient,
         )
-        self._hide_old_layers([name_radial_gradient])
+        self._hide_old_layers([layer.name])
 
     def _annotate_surface_features(self):
         stack = self.annotate_surface_groupbox.comboboxes["Surface"].value.data
