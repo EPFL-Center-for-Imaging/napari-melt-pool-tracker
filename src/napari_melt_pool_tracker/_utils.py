@@ -153,7 +153,7 @@ def determine_laser_speed_and_position_from_points(
 ) -> (float, float):
     """
     Calculates the coefficient and intercept of the line
-    that passes throught he two specified points.
+    that passes throught the two specified points.
 
     Parameters
     ----------
