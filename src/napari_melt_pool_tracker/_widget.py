@@ -293,23 +293,21 @@ class MeltPoolTrackerQWidget(QWidget):
 
         left_margin = self.window_groupbox.sliders["Left margin"].value()
         right_margin = self.window_groupbox.sliders["Right margin"].value()
-        self.window_offset = left_margin
-        self.window_size = left_margin + right_margin
-        self.window_size = min(
-            self.window_size, stack.shape[2] - self.window_offset
-        )
+        window_offset = left_margin
+        window_size = left_margin + right_margin
+        window_size = min(window_size, stack.shape[2] - window_offset)
         resliced, position_df = _utils.reslice_with_moving_window(
             stack=stack,
             coef=coef,
             intercept=intercept,
-            window_offset=self.window_offset,
-            window_size=self.window_size,
+            window_offset=window_offset,
+            window_size=window_size,
         )
 
         resliced_laser_coords = np.stack(
             [
                 [0, resliced.shape[1] - 1],
-                [self.window_offset, self.window_offset],
+                [window_offset, window_offset],
             ],
             axis=1,
         )
