@@ -16,25 +16,31 @@ def test_integration_of_steps(make_napari_viewer, capsys):
     widget = MeltPoolTrackerQWidget(viewer)
 
     # test widget methods
-    widget.speed_pos_groupbox.comboboxes["Input"].setCurrentText("test_image")
+    widget.speed_pos_groupbox.comboboxes["Input"].value = viewer.layers[
+        "test_image"
+    ]
     widget._determine_laser_speed_and_position()
-    widget.window_groupbox.comboboxes["Stack"].setCurrentText("test_image")
-    widget.window_groupbox.comboboxes["Line"].setCurrentText("test_image_line")
+    widget.window_groupbox.comboboxes["Stack"].value = viewer.layers[
+        "test_image"
+    ]
+    widget.window_groupbox.comboboxes["Line"].value = viewer.layers[
+        "test_image_line"
+    ]
     widget._reslice_with_moving_window()
-    widget.filter_groupbox.comboboxes["Input"].setCurrentText(
+    widget.filter_groupbox.comboboxes["Input"].value = viewer.layers[
         "test_image_resliced"
-    )
+    ]
     widget._filter()
-    widget.radial_groupbox.comboboxes["Input"].setCurrentText(
+    widget.radial_groupbox.comboboxes["Input"].value = viewer.layers[
         "test_image_resliced_filtered"
-    )
+    ]
     widget._calculate_radial_gradient()
-    widget.annotate_surface_groupbox.comboboxes["Input"].setCurrentText(
+    widget.annotate_surface_groupbox.comboboxes["Input"].value = viewer.layers[
         "test_image_resliced_filtered_radial_gradient"
-    )
-    widget.annotate_surface_groupbox.comboboxes["Surface"].setCurrentText(
-        "test_image_resliced_filtered"
-    )
+    ]
+    widget.annotate_surface_groupbox.comboboxes[
+        "Surface"
+    ].value = viewer.layers["test_image_resliced_filtered"]
     widget._annotate_surface_features()
 
     # read captured output and check that it's as we expected
@@ -51,11 +57,25 @@ def test_comboboxes(make_napari_viewer, capsys):
     # create our widget, passing in the viewer
     widget = MeltPoolTrackerQWidget(viewer)
 
-    for combobox, layer_type in widget.comboboxes:
-        if layer_type == "image":
-            assert combobox.count() == 1
-        if layer_type == "shapes":
-            assert combobox.count() == 0
+    image_comboboxes = [
+        widget.speed_pos_groupbox.comboboxes["Input"],
+        widget.window_groupbox.comboboxes["Stack"],
+        widget.filter_groupbox.comboboxes["Input"],
+        widget.radial_groupbox.comboboxes["Input"],
+        widget.annotate_surface_groupbox.comboboxes["Input"],
+        widget.annotate_surface_groupbox.comboboxes["Surface"],
+    ]
+    shape_comboboxes = [widget.window_groupbox.comboboxes["Line"]]
+
+    for combobox in image_comboboxes:
+        assert len(combobox.choices) == 1
+    for combobox in shape_comboboxes:
+        assert len(combobox.choices) == 0
+    # for combobox, layer_type in widget.comboboxes:
+    #     if layer_type == "image":
+    #         assert combobox.count() == 1
+    #     if layer_type == "shapes":
+    #         assert combobox.count() == 0
 
     viewer.add_image(test_data, name="test_image_1")
     viewer.add_image(test_data, name="test_image_2")
@@ -67,20 +87,28 @@ def test_comboboxes(make_napari_viewer, capsys):
         [[0, 10], [0, 10]], shape_type="line", name="test_line_1"
     )
 
-    for combobox, layer_type in widget.comboboxes:
-        if layer_type == "image":
-            assert combobox.count() == 3
-        if layer_type == "shapes":
-            assert combobox.count() == 2
+    for combobox in image_comboboxes:
+        assert len(combobox.choices) == 3
+    for combobox in shape_comboboxes:
+        assert len(combobox.choices) == 2
+    # for combobox, layer_type in widget.comboboxes:
+    #     if layer_type == "image":
+    #         assert combobox.count() == 3
+    #     if layer_type == "shapes":
+    #         assert combobox.count() == 2
 
     del viewer.layers["test_image_1"]
     del viewer.layers["test_line_1"]
 
-    for combobox, layer_type in widget.comboboxes:
-        if layer_type == "image":
-            assert combobox.count() == 2
-        if layer_type == "shapes":
-            assert combobox.count() == 1
+    for combobox in image_comboboxes:
+        assert len(combobox.choices) == 2
+    for combobox in shape_comboboxes:
+        assert len(combobox.choices) == 1
+    # for combobox, layer_type in widget.comboboxes:
+    #     if layer_type == "image":
+    #         assert combobox.count() == 2
+    #     if layer_type == "shapes":
+    #         assert combobox.count() == 1
 
     # read captured output and check that it's as we expected
     captured = capsys.readouterr()
@@ -92,20 +120,19 @@ def test_determine_laser_speed_and_position(make_napari_viewer, capsys):
     test_data = np.zeros((100, 100, 100))
     test_data[:, 50:, :] = 255
     name = "test_image"
-    viewer.add_image(test_data, name=name)
+    image_layer = viewer.add_image(test_data, name=name)
 
     # create our widget, passing in the viewer
     widget = MeltPoolTrackerQWidget(viewer)
 
     expected_shape = (
-        viewer.layers[name].data.shape[0],
-        viewer.layers[name].data.shape[2],
+        image_layer.data.shape[0],
+        image_layer.data.shape[2],
     )
 
-    for i in range(widget.speed_pos_groupbox.comboboxes["Mode"].count()):
-        widget.speed_pos_groupbox.comboboxes["Input"].setCurrentText(name)
-        mode = widget.speed_pos_groupbox.comboboxes["Mode"].itemText(i)
-        widget.speed_pos_groupbox.comboboxes["Mode"].setCurrentIndex(i)
+    for mode in widget.speed_pos_groupbox.comboboxes["Mode"].choices:
+        widget.speed_pos_groupbox.comboboxes["Input"].value = image_layer
+        widget.speed_pos_groupbox.comboboxes["Mode"].value = mode
         widget._determine_laser_speed_and_position()
         assert np.all(
             viewer.layers[f"{name}_{mode}"].data.shape == expected_shape
@@ -125,14 +152,16 @@ def test_reslice_with_moving_window(make_napari_viewer, capsys):
     test_data[:, 50:, :] = 255
     image_name = "test_image"
     line_name = "test_line"
-    viewer.add_image(test_data, name=image_name)
-    viewer.add_shapes([[0, 0], [100, 100]], shape_type="line", name=line_name)
+    image_layer = viewer.add_image(test_data, name=image_name)
+    line_layer = viewer.add_shapes(
+        [[0, 0], [100, 100]], shape_type="line", name=line_name
+    )
 
     # create our widget, passing in the viewer
     widget = MeltPoolTrackerQWidget(viewer)
 
-    widget.window_groupbox.comboboxes["Stack"].setCurrentText(image_name)
-    widget.window_groupbox.comboboxes["Line"].setCurrentText(line_name)
+    widget.window_groupbox.comboboxes["Stack"].value = image_layer
+    widget.window_groupbox.comboboxes["Line"].value = line_layer
 
     # Test auto run option for left margin
     new_left_margin = widget.window_groupbox.sliders["Left margin"].value() - 5
@@ -189,11 +218,11 @@ def test_filter(make_napari_viewer, capsys):
     viewer = make_napari_viewer()
     image_data = np.ones((10, 10, 10))
     image_name = "test_image"
-    viewer.add_image(image_data, name=image_name)
+    image_layer = viewer.add_image(image_data, name=image_name)
 
     widget = MeltPoolTrackerQWidget(viewer)
 
-    widget.filter_groupbox.comboboxes["Input"].setCurrentText(image_name)
+    widget.filter_groupbox.comboboxes["Input"].value = image_layer
 
     # Test auto run
     for slider_name in ["Kernel t", "Kernel y", "Kernel x"]:
@@ -221,11 +250,11 @@ def test_calculate_radial_gradient(make_napari_viewer, capsys):
     viewer = make_napari_viewer()
     image_data = np.ones((10, 10, 10))
     image_name = "test_image"
-    viewer.add_image(image_data, name=image_name)
+    image_layer = viewer.add_image(image_data, name=image_name)
 
     widget = MeltPoolTrackerQWidget(viewer)
 
-    widget.radial_groupbox.comboboxes["Input"].setCurrentText(image_name)
+    widget.radial_groupbox.comboboxes["Input"].value = image_layer
 
     widget._calculate_radial_gradient()
     assert viewer.layers[f"{image_name}_radial_gradient"]
@@ -240,16 +269,12 @@ def test_annotate_surface_features(make_napari_viewer, capsys):
     image_data = np.zeros((10, 10, 10))
     image_data[:, :5, :] = 1
     image_name = "test_image"
-    viewer.add_image(image_data, name=image_name)
+    image_layer = viewer.add_image(image_data, name=image_name)
 
     widget = MeltPoolTrackerQWidget(viewer)
 
-    widget.annotate_surface_groupbox.comboboxes["Input"].setCurrentText(
-        image_name
-    )
-    widget.annotate_surface_groupbox.comboboxes["Surface"].setCurrentText(
-        image_name
-    )
+    widget.annotate_surface_groupbox.comboboxes["Input"].value = image_layer
+    widget.annotate_surface_groupbox.comboboxes["Surface"].value = image_layer
 
     widget._annotate_surface_features()
 
