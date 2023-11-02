@@ -22,9 +22,7 @@ def make_sample_data():
     # Check the documentation for more information about the
     # add_image_kwargs
     # https://napari.org/stable/api/napari.Viewer.html#napari.Viewer.add_image
-    DATA_DIR = pkg_resources.resource_filename(
-        "napari_melt_pool_tracker", "../../data/"
-    )
+    DATA_DIR = pkg_resources.resource_filename(__name__, "data/")
     DATA_DIR = pathlib.Path(DATA_DIR)
     data = tifffile.imread(DATA_DIR / "wall1_H5.tif")
     return [(data, {"name": "wall1_H5"})]
