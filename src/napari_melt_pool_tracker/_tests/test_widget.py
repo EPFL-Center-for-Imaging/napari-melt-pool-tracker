@@ -35,13 +35,6 @@ def test_integration_of_steps(make_napari_viewer, capsys):
         "test_image_resliced_filtered"
     ]
     widget._calculate_radial_gradient()
-    widget.annotate_surface_groupbox.comboboxes["Input"].value = viewer.layers[
-        "test_image_resliced_filtered_radial_gradient"
-    ]
-    widget.annotate_surface_groupbox.comboboxes[
-        "Surface"
-    ].value = viewer.layers["test_image_resliced_filtered"]
-    widget._annotate_surface_features()
 
     # read captured output and check that it's as we expected
     captured = capsys.readouterr()
@@ -62,8 +55,6 @@ def test_comboboxes(make_napari_viewer, capsys):
         widget.window_groupbox.comboboxes["Stack"],
         widget.filter_groupbox.comboboxes["Input"],
         widget.radial_groupbox.comboboxes["Input"],
-        widget.annotate_surface_groupbox.comboboxes["Input"],
-        widget.annotate_surface_groupbox.comboboxes["Surface"],
     ]
     shape_comboboxes = [widget.window_groupbox.comboboxes["Line"]]
 
@@ -258,30 +249,6 @@ def test_calculate_radial_gradient(make_napari_viewer, capsys):
 
     widget._calculate_radial_gradient()
     assert viewer.layers[f"{image_name}_radial_gradient"]
-
-    # read captured output and check that it's as we expected
-    captured = capsys.readouterr()
-    assert captured.out == ""
-
-
-def test_annotate_surface_features(make_napari_viewer, capsys):
-    viewer = make_napari_viewer()
-    image_data = np.zeros((10, 10, 10))
-    image_data[:, :5, :] = 1
-    image_name = "test_image"
-    image_layer = viewer.add_image(image_data, name=image_name)
-
-    widget = MeltPoolTrackerQWidget(viewer)
-
-    widget.annotate_surface_groupbox.comboboxes["Input"].value = image_layer
-    widget.annotate_surface_groupbox.comboboxes["Surface"].value = image_layer
-
-    widget._annotate_surface_features()
-
-    assert viewer.layers["MP front edge"]
-    assert viewer.layers["MP back edge"]
-    assert viewer.layers["DZ front edge"]
-    assert viewer.layers["DZ back edge"]
 
     # read captured output and check that it's as we expected
     captured = capsys.readouterr()

@@ -172,27 +172,12 @@ class MeltPoolTrackerQWidget(QWidget):
         )
 
         #####################
-        # Surface annotation
+        # Annotation
         #####################
-        self.annotate_surface_groupbox = StepWidget(
-            viewer=self.viewer,
-            name="5. Annotate surface features",
-            comboboxes=[
-                ("Input", napari.layers.Image),
-                ("Surface", napari.layers.Image),
-            ],
-        )
-        self.annotate_surface_groupbox.btn.clicked.connect(
-            self._annotate_surface_features
-        )
-
-        #####################
-        # Depth annotation
-        #####################
-        annotate_depth_groupbox = QGroupBox("6. Annotate depths")
-        annotate_depth_layout = QVBoxLayout()
-        annotate_depth_groupbox.setLayout(annotate_depth_layout)
-        annotate_depth_layout.addWidget(
+        annotate_groupbox = QGroupBox("5. Annotate depths")
+        annotate_layout = QVBoxLayout()
+        annotate_groupbox.setLayout(annotate_layout)
+        annotate_layout.addWidget(
             napari_cursor_tracker.CursorTracker(self.viewer)
         )
 
@@ -213,8 +198,7 @@ class MeltPoolTrackerQWidget(QWidget):
         self.scroll_layout.addWidget(self.window_groupbox)
         self.scroll_layout.addWidget(self.filter_groupbox)
         self.scroll_layout.addWidget(self.radial_groupbox)
-        self.scroll_layout.addWidget(self.annotate_surface_groupbox)
-        self.scroll_layout.addWidget(annotate_depth_groupbox)
+        self.scroll_layout.addWidget(annotate_groupbox)
 
         self.scroll.setWidget(self.scroll_content)
 
@@ -410,25 +394,6 @@ class MeltPoolTrackerQWidget(QWidget):
             name=name_radial_gradient,
         )
         self._hide_old_layers([layer.name])
-
-    def _annotate_surface_features(self):
-        stack = self.annotate_surface_groupbox.comboboxes["Surface"].value.data
-        edges = self.annotate_surface_groupbox.comboboxes["Input"].value.data
-        surface_image = _utils.get_surface_image(stack, edges)
-        self.viewer.add_image(surface_image)
-        self.viewer.add_shapes(name="MP front edge")
-        self.viewer.add_shapes(name="MP back edge")
-        self.viewer.add_shapes(name="DZ front edge")
-        self.viewer.add_shapes(name="DZ back edge")
-        self._hide_old_layers(
-            [
-                "surface_image",
-                "MP front edge",
-                "MP back edge",
-                "DZ front edge",
-                "DZ back edge",
-            ]
-        )
 
     def _hide_old_layers(self, new_layer_names):
         for layer in self.viewer.layers:
