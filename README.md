@@ -1,9 +1,9 @@
 # napari-melt-pool-tracker
 
-[![License BSD-3](https://img.shields.io/pypi/l/napari-melt-pool-tracker.svg?color=green)](https://github.com/faymanns/napari-melt-pool-tracker/raw/main/LICENSE)
+[![License BSD-3](https://img.shields.io/pypi/l/napari-melt-pool-tracker.svg?color=green)](https://github.com/EPFL-Center-for-Imaging/napari-melt-pool-tracker/raw/main/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/napari-melt-pool-tracker.svg?color=green)](https://pypi.org/project/napari-melt-pool-tracker)
 [![Python Version](https://img.shields.io/pypi/pyversions/napari-melt-pool-tracker.svg?color=green)](https://python.org)
-[![tests](https://github.com/faymanns/napari-melt-pool-tracker/workflows/tests/badge.svg)](https://github.com/faymanns/napari-melt-pool-tracker/actions)
+[![tests](https://github.com/EPFL-Center-for-Imaging/napari-melt-pool-tracker/workflows/tests/badge.svg)](https://github.com/EPFL-Center-for-Imaging/napari-melt-pool-tracker/actions)
 [![codecov](https://codecov.io/gh/faymanns/napari-melt-pool-tracker/branch/main/graph/badge.svg)](https://codecov.io/gh/faymanns/napari-melt-pool-tracker)
 [![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-melt-pool-tracker)](https://napari-hub.org/plugins/napari-melt-pool-tracker)
 
