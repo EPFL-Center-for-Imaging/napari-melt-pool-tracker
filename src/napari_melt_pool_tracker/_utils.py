@@ -112,8 +112,6 @@ def reslice_with_moving_window(
     for t in range(n_t):
         laser_pos = coef * t + intercept
         laser_pos = round(laser_pos)
-        if laser_pos > width:
-            break
         start = laser_pos - window_offset
         stop = laser_pos - window_offset + window_size
         current_positions = pd.DataFrame(
