@@ -12,7 +12,6 @@ import napari
 import napari_cursor_tracker
 import numpy as np
 import scipy
-import skimage
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
     QCheckBox,
@@ -340,15 +339,12 @@ class MeltPoolTrackerQWidget(QWidget):
         input_layer = self.filter_groupbox.comboboxes["Input"].value
         name = input_layer.name
         stack = input_layer.data
-        thresh = skimage.filters.threshold_otsu(stack)
-        filtered = np.clip(stack, 0, thresh)
-        filtered = filtered / np.max(filtered)
         kernel_t = self.filter_groupbox.sliders["Kernel t"].value()
         kernel_y = self.filter_groupbox.sliders["Kernel y"].value()
         kernel_x = self.filter_groupbox.sliders["Kernel x"].value()
         name_filtered = f"{name}_filtered"
         filtered = scipy.ndimage.median_filter(
-            filtered, (kernel_t, kernel_y, kernel_x)
+            stack, (kernel_t, kernel_y, kernel_x)
         )
         filtered_name = name_filtered
         if (
